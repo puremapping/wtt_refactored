@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# 测试不碰真实 data/wtt.db（conftest 里重定向到临时库），0 次 LLM 真调用
