@@ -2,6 +2,74 @@
 
 > 维护规则：接手即登记、收工即更新、按时间倒序
 
+## 20261025_wtt_refactored（v0.8 重构）
+
+- **时间**：2026-10-25
+- **模型 / 来源**：GLM-5.3-Flash / zcode
+- **仓库**：`wtt_refactored`（全新 git 仓库；原 `where_to_travel` 原封未动作回退基准）
+
+### 做了什么
+
+**重构计划先行**：调研全部 7.5k 行源码 + 文档 + 数据库实证，产出 `REFACTOR_PLAN.md`
+（12 个缺陷清单、目标结构、8 阶段计划、11 项功能验收单）；阿哲拍板三项：
+全套做 / 多城市彻底隔离 / 对话页前端不动。
+
+**Phase 0-1 基线与安全网**：复制落库 + OpenAPI 35 路由快照存档；
+pytest 基建（临时库 / SECRET_KEY 注入 / 城市缓存清理），
+92 项纯逻辑 + FakeLLM 编排 + API 测试，0 次 LLM 真调用。
+
+**Phase 2a 修复 12 个缺陷**（原计划 9 个 + 测试发现 3 个）：
+- BUG-1 时长 9-12h 回落 6h 档（给的时间越多行程反而越短）
+- BUG-2 「换一批」三处断裂（排除列表没接、候选耗尽回退）
+- BUG-4 帖子列表 N+1 连接（20 帖 21 连接）
+- BUG-5 SECRET_KEY 缺失随机生成（重启全员掉登录）→ 改拒绝启动
+- BUG-6 看板凭证进访问日志 → 改 X-Admin-Token 请求头
+- BUG-7 /api/chat 无限流（LLM 费用暴露）→ 滑动窗口限流
+- BUG-8 前端 esc() 不转义引号（5 处）
+- BUG-9 匿名修改行程只写库（内存会话落空，AI 看旧行程）
+- BUG-10 叙述防幻觉校验系统性误报（几乎每条叙述都白烧一次重写）
+- BUG-11 画像合并在回复之后（本轮刚说的话对回复/强制补调/兜底/边界全不可见）
+- BUG-12 「加一站」修改被 target 校验挡死，实际不可用
+- 加固-1 行程修改 UPDATE 补 AND user_id=?
+
+**Phase 2b 结构重构**（行为不变，路由快照逐条勾稽 35=35 零差异）：
+main.py 849→60 行；routers/ 九个域；conversation.py 894 行拆六模块包；
+行程管线迁入 services/itinerary_flow.py；startup 改 lifespan。
+
+**Phase 2c 多城市彻底隔离**：transport/crowd_index 加 city 列（真库迁移验证 216/217 行无损）；
+推荐/行程管线全贯通城市维度；join 按 (名称,城市) 双条件——同名景点人流/地铁不串；
+未指定目的地默认景区最多城市。8 项隔离测试含端到端「成都行程零北京景点」。
+
+**Phase 2d/3 工程化**：删死代码（motivation.py 导入、index.html 死页、6 个零使用依赖）；
+requirements.txt → pyproject.toml（补声明 openpyxl）；静态资源自动版本号（根治手动 ?v=N）；
+scripts/start|dev|kill.bat（ASCII 编码，bat 中文会乱码踩坑）；README/DESIGN/sessions/timeline 全部同步。
+
+### 留下的
+
+**新增**：`REFACTOR_PLAN.md`、`app/routers/`（9 域+deps）、`app/services/conversation/` 包、
+`app/services/itinerary_flow.py`、`app/core/ratelimit.py`、`tests/`（117 项）、`scripts/*.bat`、`pyproject.toml`
+
+**修改**：db.py（city 迁移）、recommend.py / itinerary_flow.py（城市维度）、
+narrative.py（幻觉校验重写）、posts.py（批量点赞）、config.py（SECRET_KEY）、
+全部模板（ASSET_V 占位）、.env.example（限流/看板说明）
+
+**删除**：`app/services/motivation.py`（v0.1 死代码）、`templates/index.html`（死页）、
+`requirements.txt`（并入 pyproject）
+
+**测试数据清理**：test_auth.py 跑基线时向真库写过测试用户（沿用原项目行为），未清理
+
+### 踩坑
+
+- Git Bash 下 robocopy 的 `/E` 被 msys 转成 `E:/` → 用 cp -r + 手动剔 __pycache__
+- .bat 文件写中文在 cmd ANSI 代码页下乱码且破坏解析 → bat 一律 ASCII
+- pytest xfail(strict=True) 是防修复后忘记摘牌的好机制，修复时反转即可
+
+### 状态
+
+已完成（待阿哲按 REFACTOR_PLAN.md §8 验收单确认；真实 LLM 端到端对照未跑，需其同意消耗费用）
+
+---
+
 ## 20260917_150557_2fc998（续：2026-10-15 之后）
 
 - **时间**：2026-10-15 13:06 → 2026-10-21 18:25（仍在进行）

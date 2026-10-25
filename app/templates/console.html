@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>智能体开发 · Where to Travel</title>
-<link rel="stylesheet" href="/static/style.css?v=6">
-<link rel="stylesheet" href="/static/browse.css?v=6">
-<link rel="stylesheet" href="/static/console.css?v=6">
+<link rel="stylesheet" href="/static/style.css?v={{ ASSET_V }}">
+<link rel="stylesheet" href="/static/browse.css?v={{ ASSET_V }}">
+<link rel="stylesheet" href="/static/console.css?v={{ ASSET_V }}">
 </head>
 <body>
 
@@ -73,6 +73,6 @@
 </div>
 
 <script>window.__ME__ = {{ user | tojson }};</script>
-<script src="/static/console.js?v=6"></script>
+<script src="/static/console.js?v={{ ASSET_V }}"></script>
 </body>
 </html>

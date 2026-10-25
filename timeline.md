@@ -37,3 +37,10 @@
 - 2026-10-20: Coze Studio 私有化部署跑通 + 多租户二开 —— 12 容器 13GB；修 5 个部署坑（MinIO 撤镜像 / mc 路径 / **容器继承宿主代理导致 etcd 起不来** / 管理员靠环境变量 / go build 静默失败）；二开 ~120 行 Go 解除 TeamSpaceNum 硬编码与 spacePo2Do 写死；实测建 3 个文旅局空间、发布 connector 1024、`/v3/chat` 调通。详见 `docs/research/coze-studio-hands-on.md` + `coze-studio-multitenant.patch`
 - 2026-10-20: **v0.6 城市抽象** —— 去「北京」硬编码（`cities.py` 从库里算城市/区名），prompt 用 `{supported}` 占位；`attractions` 加 `city` 列。插入时踩到时序 bug：数据边界拦截读的是上一轮画像，本轮说「上海」会漏拦
 - 2026-10-21: **v0.7 三页式 + 身份系统** —— ①浏览页 /（瀑布流+内容/旅游灵感/热榜三页签）②AI 对话 /chat（加「分享行程」）③个人主页 /me；独立登录页 /login（**拆掉 chat 内嵌弹窗**）；身份 person|agency 可升级；`/console` 文旅局开发页（发布强制校验 prompt+region）；热榜按搜索命中；`posts`/`likes`/`comments`/`messages`/`teams`/`agents` 六张表。5 个测试套件全过
+- 2026-10-25: **v0.8 重构启动** —— 源码全量调研产出 REFACTOR_PLAN.md；阿哲拍板：全套做 / 多城市彻底隔离 / 对话页前端不动
+- 2026-10-25: Phase 0-1 —— 新仓库 wtt_refactored 落地，35 路由 OpenAPI 快照存档；pytest 安全网建成（92 项，FakeLLM 编排测试，0 次 LLM 真调用）
+- 2026-10-25: **测试即发现 3 个计划外 bug**（BUG-10 幻觉校验系统性误报 / BUG-11 画像合并时序 / BUG-12 加一站不可达）——「先立测试再重构」路线当场兑现价值
+- 2026-10-25: **Phase 2a 修复 12 个缺陷** —— 时长档位/换一批/N+1/SECRET_KEY/看板凭证/限流/XSS/匿名修改落空等；109 项测试全绿
+- 2026-10-25: **Phase 2b 结构重构** —— main.py 849→60 行拆 9 个 routers；conversation.py 894 行拆 6 模块包；路由快照逐条勾稽 35=35 零差异
+- 2026-10-25: **Phase 2c 多城市彻底隔离** —— transport/crowd_index 加 city 列（真库迁移无损）；join 按 (名称,城市) 双条件，同名景点数据不串；管线全贯通城市维度
+- 2026-10-25: Phase 2d/3 —— 删死代码与 6 个零使用依赖；pyproject.toml 收敛；静态资源自动版本号（根治手动 ?v=N）；start/dev/kill 启动脚本；README/DESIGN/sessions/timeline 全部同步；**117 项测试全绿**

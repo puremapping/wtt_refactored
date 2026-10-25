@@ -1,7 +1,11 @@
 # DESIGN.md — Where to Travel 设计文档
 
-**版本：** v0.2（多轮对话版）
-**更新：** 2026-09-18
+**版本：** v0.8（重构版；v0.3-v0.7 详见 docs/ 各专项设计与 timeline.md）
+**更新：** 2026-10-25
+
+> ⚠️ 本文档主体写于 v0.2，架构一节与现状有出入（现为 routers/ 拆分 + conversation 包，
+> 见 README「架构」一节与 REFACTOR_PLAN.md）。核心流程与设计决策一节仍然有效。
+> v0.2「已知问题」表的处置结果见文末「十一、v0.8 重构处置记录」。
 
 ---
 
@@ -187,3 +191,22 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8100
 | `docs/research/reusable-assets.md` | 开源仓库可复用性评估 |
 | `docs/research/arxiv-findings.md` | arXiv 技术方案（ITINERA 等） |
 | `docs/research/itinera-verification.md` | ITINERA 实跑验证 |
+
+---
+
+## 十一、v0.8 重构处置记录（2026-10-25）
+
+v0.2 第六节「已知问题（待修）」六项的处置结果：
+
+| # | 当年问题 | 处置 |
+|---|---|---|
+| 1 | 画像只能 append，列表删不掉 | ✅ v0.3 已修（`字段名_remove` 机制） |
+| 2 | 没有「出发地/目的地」概念 | ✅ v0.3 加 destination/origin 字段；v0.6 城市抽象；v0.8 管线全贯通 |
+| 3 | 行程只能生成一版 | ✅ v0.8 BUG-2 修复（换一批真正排除旧站点） |
+| 4 | 叙述可能幻觉景点 | ✅ 校验存在；v0.8 BUG-10 修复了系统性误报（无后缀幻觉仍有盲区） |
+| 5 | 画像无自然语言描述 | ✅ `summary` 字段已加（保留用户原话） |
+| 6 | 行程距离直线估算 | ⬜ 未做（高德路径规划 API 配额够，列为后续） |
+
+v0.8 重构共修复 12 个缺陷（BUG-1~12，含测试发现的 3 个计划外）、
+完成多城市数据彻底隔离、建立 117 项 pytest 安全网、结构分区收纳。
+详见 `REFACTOR_PLAN.md` 与 `sessions.md`。
