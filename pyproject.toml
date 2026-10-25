@@ -1,4 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[project]
+name = "where-to-travel"
+version = "0.8.0"
+description = "以 AI 对话为核心入口的旅游决策平台 —— 先搞清楚「为什么去」，再回答「去哪」"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "openai>=1.50",
+    "httpx>=0.27",
+    # 数据导入脚本（app/scripts/import_data.py）读 xlsx 用
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
 # 测试不碰真实 data/wtt.db（conftest 里重定向到临时库），0 次 LLM 真调用
+
+[tool.uv]
+# 与原 requirements.txt 相比收敛：
+# 移除 numpy / scipy / networkx / pandas / python-dotenv / python-multipart
+# （全项目 grep 证实零使用；行程编排是纯 Python 实现，.env 解析是自实现）
