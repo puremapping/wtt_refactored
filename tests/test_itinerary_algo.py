@@ -200,18 +200,18 @@ def test_apply_regenerate_empty_pool_fails_explicitly():
 
 
 def test_regen_exclude_plumbing():
-    """BUG-2 修复回归：main 的排除列表推导"""
-    from app.main import _regen_exclude
+    """BUG-2 修复回归：行程管线的排除列表推导"""
+    from app.services.itinerary_flow import regen_exclude
 
     cur_itin = {"stops": [{"name": "故宫"}, {"name": "天坛"}]}
 
     # 模型填了 reuse_existing → 排除全部现有站点
-    assert _regen_exclude("换一批", {"reuse_existing": True}, cur_itin) == ["故宫", "天坛"]
+    assert regen_exclude("换一批", {"reuse_existing": True}, cur_itin) == ["故宫", "天坛"]
     # 用户话带关键词（模型漏填 flag 的双保险）
-    assert _regen_exclude("这几个都不想去，重新来", {}, cur_itin) == ["故宫", "天坛"]
+    assert regen_exclude("这几个都不想去，重新来", {}, cur_itin) == ["故宫", "天坛"]
     # 非重生成语义 → 不排除
-    assert _regen_exclude("帮我排个行程", {}, cur_itin) is None
-    assert _regen_exclude("随便", {"reuse_existing": False}, cur_itin) is None
+    assert regen_exclude("帮我排个行程", {}, cur_itin) is None
+    assert regen_exclude("随便", {"reuse_existing": False}, cur_itin) is None
     # 无现有行程 → 不排除
-    assert _regen_exclude("换一批", {"reuse_existing": True}, None) is None
-    assert _regen_exclude("换一批", {"reuse_existing": True}, {"stops": []}) is None
+    assert regen_exclude("换一批", {"reuse_existing": True}, None) is None
+    assert regen_exclude("换一批", {"reuse_existing": True}, {"stops": []}) is None
