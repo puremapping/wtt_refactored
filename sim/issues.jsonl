@@ -1,0 +1,2 @@
+{"time": "2026-10-25T20:26:57.263731", "severity": "note", "where": "XSS探针", "what": "服务端按设计原样存储，转义依赖前端 esc() —— 已确认 esc() 带引号转义（BUG-8 已修），浏览器端不会执行", "evidence": null}
+{"time": "2026-10-25T20:26:57.900950", "severity": "high", "where": "越权", "what": "他局账号竟能发布本局智能体（400）", "evidence": null}
