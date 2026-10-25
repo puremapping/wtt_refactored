@@ -33,14 +33,18 @@ def test_parse_garbage_returns_none():
 STOPS = [{"name": "故宫博物院"}, {"name": "天坛公园"}]
 
 
-@pytest.mark.xfail(reason="BUG-10: 验证器正则把上下文抓进候选名（「到达故宫」），"
-                          "宫/园在后缀表导致几乎每条叙述都误报幻觉。Phase 2a 修复",
-                   strict=True)
 def test_verify_clean_narrative():
+    """BUG-10 修复回归：真实站点的叙述不得误报（含上下文粘连的情况）"""
     ok, suspects = _verify_narrative(
         "上午九点到达故宫博物院，之后前往天坛公园。", STOPS)
     assert ok
     assert suspects == []
+
+
+def test_verify_real_spot_short_name():
+    """「故宫」「天坛」是真实站点的合理简称，不得误报"""
+    ok, _ = _verify_narrative("先到故宫，再到天坛公园。", STOPS)
+    assert ok
 
 
 def test_verify_detects_hallucinated_spot():

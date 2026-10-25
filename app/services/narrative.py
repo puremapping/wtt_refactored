@@ -40,6 +40,14 @@ def _verify_narrative(text: str, stops: list) -> tuple:
 
     做法：从叙述里找出「看起来像景点名」的词（含「景区/公园/博物馆/寺/宫/园」
     等后缀），检查是否都在实际站点里。不在的就是疑似幻觉。
+
+    ⚠️ BUG-10 修复：正则的 {2,10} 前缀会把上下文一起抓进来
+    （「到达故宫博物院」→「到达故宫」），原实现整词比对导致
+    几乎每条真叙述都误报幻觉、总是触发重写（多烧一次 LLM 且救不回来）。
+    现在用「后缀窗口」判断候选词是否指代真实站点（见 _is_real_mention）。
+
+    已知局限：无景点后缀的幻觉（「杭州西湖」）抓不到 —— 不引 NER 的
+    前提下接受此取舍，第一道防线是 prompt 的硬性约束。
     """
     import re
     if not text:
@@ -50,8 +58,8 @@ def _verify_narrative(text: str, stops: list) -> tuple:
     real_short = set()
     for n in real:
         real_short.add(n)
-        for suf in ("景区", "风景区", "公园", "博物馆", "纪念馆", "旅游区"):
-            if n.endswith(suf):
+        for suf in ("景区", "风景区", "旅游区", "博物馆", "博物院", "纪念馆", "公园"):
+            if n.endswith(suf) and len(n) > len(suf):
                 real_short.add(n[:-len(suf)])
 
     # 找出叙述里带景点特征后缀的词
@@ -61,12 +69,33 @@ def _verify_narrative(text: str, stops: list) -> tuple:
     suspects = []
     for m in re.finditer(pattern, text):
         word = m.group(0)
-        # 命中真实的就跳过
-        if any(word in r or r in word for r in real_short):
+        if _is_real_mention(word, real_short):
             continue
         suspects.append(word)
 
     return (len(suspects) == 0), suspects[:5]
+
+
+def _is_real_mention(word: str, real_names: set) -> bool:
+    """候选词是否指代真实站点（BUG-10 的核心判断）
+
+    正则会把上下文字符一起抓进来，所以不能整词比对，按序尝试：
+      1. 整词命中真实站点（含简称）
+      2. 词里包含某个真实站点名（「游故宫博物院吧」包含「故宫」）
+      3. 词的任意后缀命中真实站点名（「到达故宫」的后缀「故宫」）
+
+    第 3 条故意偏宽松：漏报幻觉的代价（叙述多提一个词）远小于
+    误报的代价（每条叙述都触发重写，重写还未必合格）。
+    """
+    if word in real_names:
+        return True
+    for r in real_names:
+        if r in word:
+            return True
+    for k in range(2, len(word)):
+        if word[-k:] in real_names:
+            return True
+    return False
 
 ASSESS_PROMPT = """你是旅行规划助手。根据给出的行程，给出简短评估。
 
