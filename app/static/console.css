@@ -1,0 +1,119 @@
+/* 文旅局开发页 */
+
+.console-brand {
+  display: flex; align-items: center; gap: 10px;
+  margin-left: 8px;
+}
+.cons-tag {
+  font-size: 11px;
+  padding: 3px 9px;
+  background: linear-gradient(135deg, #4c8dff, #7b5cff);
+  color: #fff;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+.cons-org { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+
+.console-wrap {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+
+.console-head {
+  display: flex; justify-content: space-between;
+  align-items: flex-start; gap: 20px;
+  margin-bottom: 22px;
+}
+.console-head h1 { margin: 0 0 6px; font-size: 22px; }
+.console-head .dim { font-size: 13px; color: #888; line-height: 1.7; }
+
+.primary {
+  padding: 10px 20px;
+  border: none; border-radius: 9px;
+  background: #4c8dff; color: #fff;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.primary:hover { background: #3b7ae8; }
+.primary:disabled { opacity: .6; cursor: default; }
+
+/* 卡片网格 */
+.agent-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.agent-card {
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  padding: 16px 18px;
+  transition: box-shadow .15s;
+}
+.agent-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+.agent-card.is-pub { border-left: 3px solid #4c8dff; }
+
+.ag-head {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 8px;
+}
+.ag-name { font-size: 15px; }
+.ag-status {
+  font-size: 11px; padding: 2px 8px; border-radius: 8px;
+}
+.ag-status.pub { background: #e8f3ff; color: #4c8dff; }
+.ag-status.draft { background: #f4f4f5; color: #999; }
+
+.ag-region { font-size: 12px; color: #4c8dff; margin-bottom: 8px; }
+.ag-desc { font-size: 13px; color: #555; margin: 0 0 8px; line-height: 1.6; }
+.ag-prompt {
+  font-size: 12px; color: #999; margin: 0 0 12px;
+  line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.ag-foot { display: flex; gap: 8px; }
+.ag-btn {
+  padding: 5px 12px;
+  border: 1px solid #e6e8ee; border-radius: 7px;
+  background: #fff; color: #555;
+  font-size: 12px; cursor: pointer;
+}
+.ag-btn:hover { border-color: #c4d5ff; color: #4c8dff; }
+.ag-btn.primary-mini { background: #4c8dff; color: #fff; border-color: #4c8dff; }
+.ag-btn.primary-mini:hover { background: #3b7ae8; }
+.ag-btn.danger:hover { border-color: #ffd6da; color: #d03050; }
+
+/* 表单弹窗 */
+.agent-form { max-width: 520px; }
+.agent-form h3 { margin: 0 0 18px; font-size: 18px; }
+.agent-form .fld { margin-bottom: 15px; }
+.agent-form .fld span { font-size: 13px; color: #666; margin-bottom: 6px; display: block; }
+.agent-form .fld em { color: #d03050; font-style: normal; font-size: 11px; }
+.agent-form input, .agent-form textarea {
+  width: 100%; box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #e0e3ea; border-radius: 8px;
+  font-size: 14px; outline: none;
+  font-family: inherit;
+  background: #fafbfc;
+}
+.agent-form input:focus, .agent-form textarea:focus {
+  background: #fff; border-color: #4c8dff;
+}
+.agent-form textarea { resize: vertical; line-height: 1.7; }
+.hint { display: block; font-size: 11px; color: #aaa; margin-top: 5px; }
+
+.login-error { color: #d03050; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center; padding: 60px 20px;
+  color: #999; font-size: 14px; line-height: 1.9;
+}
+
+.fld { display: block; margin-bottom: 14px; }
+.fld span { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }

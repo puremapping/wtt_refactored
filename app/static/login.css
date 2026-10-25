@@ -1,0 +1,142 @@
+/* 登录页 */
+
+.login-body {
+  margin: 0;
+  background: #f6f8fb;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+               "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+}
+
+.login-shell {
+  display: flex;
+  min-height: 100vh;
+  max-width: 1000px;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 0 60px rgba(0,0,0,.05);
+}
+
+/* 左侧品牌区 */
+.login-side {
+  flex: 1;
+  padding: 60px 44px;
+  background: linear-gradient(160deg, #4c8dff 0%, #7b5cff 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.login-logo {
+  font-size: 24px; font-weight: 700;
+  color: #fff; text-decoration: none;
+  margin-bottom: 22px;
+}
+.login-slogan {
+  font-size: 19px; line-height: 1.65;
+  margin: 0 0 32px; font-weight: 500;
+}
+.login-feats {
+  list-style: none; padding: 0; margin: 0;
+  font-size: 14px; line-height: 2.2;
+  opacity: .92;
+}
+.login-feats li::before {
+  content: "· "; font-weight: 700;
+}
+
+/* 右侧表单 */
+.login-main {
+  width: 420px;
+  padding: 56px 40px;
+  display: flex; flex-direction: column;
+  justify-content: center;
+}
+.login-main h1 {
+  margin: 0 0 22px; font-size: 24px; color: #1a1a1a;
+}
+
+/* 身份选择 */
+.role-picker { margin-bottom: 20px; }
+.role-label {
+  font-size: 13px; color: #777; margin-bottom: 9px;
+}
+.role-opts { display: flex; gap: 12px; }
+.role-opt {
+  flex: 1;
+  padding: 14px 12px;
+  border: 1.5px solid #e6e8ee;
+  border-radius: 11px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: all .15s;
+}
+.role-opt:hover { border-color: #c4d5ff; }
+.role-opt.active {
+  border-color: #4c8dff;
+  background: #f5f9ff;
+}
+.role-ico { font-size: 20px; display: block; margin-bottom: 5px; }
+.role-name {
+  font-size: 14px; font-weight: 600; color: #1a1a1a;
+  display: block; margin-bottom: 3px;
+}
+.role-desc { font-size: 12px; color: #888; }
+
+/* 表单字段 */
+.fld { display: block; margin-bottom: 14px; }
+.fld span {
+  display: block; font-size: 13px; color: #666;
+  margin-bottom: 6px;
+}
+.fld input {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 13px;
+  border: 1px solid #e0e3ea;
+  border-radius: 9px;
+  font-size: 14px; outline: none;
+  background: #fafbfc;
+}
+.fld input:focus {
+  background: #fff; border-color: #4c8dff;
+}
+
+.login-error {
+  color: #d03050; font-size: 13px;
+  min-height: 20px; margin-bottom: 6px;
+}
+
+.primary.full {
+  width: 100%;
+  padding: 12px;
+  border: none; border-radius: 9px;
+  background: #4c8dff; color: #fff;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+}
+.primary.full:disabled { opacity: .6; cursor: default; }
+.primary.full:hover:not(:disabled) { background: #3b7ae8; }
+
+.login-foot {
+  display: flex; justify-content: space-between;
+  margin-top: 18px; font-size: 13px;
+}
+.login-foot a { color: #4c8dff; text-decoration: none; }
+.login-foot a.dim { color: #999; }
+.login-foot a:hover { text-decoration: underline; }
+
+.login-privacy {
+  margin-top: 26px; font-size: 12px;
+  color: #aaa; line-height: 1.7;
+}
+
+.dim { color: #999; font-weight: 400; }
+
+@media (max-width: 760px) {
+  .login-side { display: none; }
+  .login-shell { box-shadow: none; }
+  .login-main { width: 100%; padding: 40px 24px; }
+}
+
+.hidden { display: none !important; }

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where to Travel — 先搞清楚为什么去</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo">Where to Travel</span>
+    <span class="tagline">不只告诉你「去哪」，先帮你搞清楚「为什么去」</span>
+  </div>
+  <div class="header-right">
+    <span id="stats" class="stats"></span>
+    <span id="user-box" class="user-box"></span>
+    <button id="btn-history" class="ghost small hidden">我的行程</button>
+    <button id="btn-restart" class="ghost small hidden">重新开始</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- 左栏：对话 -->
+  <main class="chat-pane">
+    <div id="messages" class="messages"></div>
+
+    <div class="composer">
+      <textarea id="input" rows="1"
+        placeholder="说说你这次想怎么过……（Enter 发送，Shift+Enter 换行）"></textarea>
+      <button id="btn-send" class="primary">发送</button>
+    </div>
+
+    <div id="starters" class="starters">
+      <span class="st-label">试试：</span>
+      <button class="st">想去北京玩一天</button>
+      <button class="st">最近工作太累了，想找个人少的地方待着</button>
+      <button class="st">带爸妈出去走走，他们走不快</button>
+      <button class="st">想拍点好看的照片</button>
+    </div>
+  </main>
+
+  <!-- 右栏：画像 + 行程 -->
+  <aside class="side-pane">
+    <div class="side-block">
+      <h3>我了解到的</h3>
+      <div id="profile" class="profile">
+        <div class="empty">还没开始聊</div>
+      </div>
+    </div>
+
+    <div id="cta-block" class="side-block hidden">
+      <button id="btn-itinerary" class="primary full">看行程</button>
+      <p class="hint-small">随时可以继续聊，聊得越细行程越准</p>
+    </div>
+
+    <div id="result-block" class="side-block hidden">
+      <h3>行程</h3>
+      <div id="narrative" class="narrative"></div>
+      <div id="assessment" class="assessment"></div>
+      <div id="timeline" class="timeline"></div>
+      <div id="map" class="map"></div>
+    </div>
+  </aside>
+
+</div>
+
+<div id="loading" class="loading hidden">
+  <div class="spinner"></div>
+  <span id="loading-text">正在思考……</span>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- 登录 / 注册弹窗 -->
+<div id="auth-modal" class="modal hidden">
+  <div class="modal-card">
+    <button class="modal-close" id="auth-close">×</button>
+    <h3 id="auth-title">登录</h3>
+    <p class="modal-hint" id="auth-hint">登录后行程会保存到你的账号。</p>
+    <input id="auth-email" type="email" placeholder="邮箱" autocomplete="email">
+    <input id="auth-password" type="password" placeholder="密码（至少 6 位）"
+           autocomplete="current-password">
+    <input id="auth-nickname" type="text" placeholder="昵称（可选）" class="hidden">
+    <div id="auth-error" class="auth-error"></div>
+    <button id="auth-submit" class="primary full">登录</button>
+    <div class="modal-foot">
+      <a href="#" id="auth-toggle">还没有账号？注册</a>
+    </div>
+  </div>
+</div>
+
+<!-- 历史会话抽屉 -->
+<div id="history-drawer" class="drawer hidden">
+  <div class="drawer-head">
+    <strong>我的行程</strong>
+    <button class="modal-close" id="history-close">×</button>
+  </div>
+  <div id="history-list" class="history-list"></div>
+</div>
+
+<script src="/static/app.js?v=4"></script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+diff --git a/backend/api/handler/coze/playground_service.go b/backend/api/handler/coze/playground_service.go
+index 1ce2ce49..154d4f18 100644
+--- a/backend/api/handler/coze/playground_service.go
++++ b/backend/api/handler/coze/playground_service.go
+@@ -371,3 +371,27 @@ func GetFileUrls(ctx context.Context, c *app.RequestContext) {
+ 
+ 	c.JSON(consts.StatusOK, resp)
+ }
++
++// CreateTeamSpace 创建团队空间（二次开发新增，未走 IDL 生成）
++//
++// 用于多租户模型：一个文旅局 = 一个 space。
++// 创建者自动成为 owner。
++func CreateTeamSpace(ctx context.Context, c *app.RequestContext) {
++	var req playground.CreateSpaceRequest
++	if err := c.BindAndValidate(&req); err != nil {
++		invalidParamRequestResponse(c, err.Error())
++		return
++	}
++	if req.Name == "" {
++		invalidParamRequestResponse(c, "name is required")
++		return
++	}
++
++	resp, err := user.UserApplicationSVC.CreateTeamSpace(ctx, &req)
++	if err != nil {
++		internalServerErrorResponse(ctx, c, err)
++		return
++	}
++
++	c.JSON(consts.StatusOK, resp)
++}
+diff --git a/backend/api/model/playground/playground.go b/backend/api/model/playground/playground.go
+index 89bdcc5b..fddfc57c 100644
+--- a/backend/api/model/playground/playground.go
++++ b/backend/api/model/playground/playground.go
+@@ -8385,6 +8385,38 @@ func (p *OnboardingContent) String() string {
+ 
+ }
+ 
++// CreateSpaceRequest 创建团队空间（二次开发手写，未走 IDL 生成）
++type CreateSpaceRequest struct {
++	// space name
++	Name string `thrift:"name,1" form:"name" json:"name" query:"name"`
++	// space description
++	Description string `thrift:"description,2" form:"description" json:"description" query:"description"`
++	// Base
++	Base *base.Base `thrift:"Base,255,optional" form:"-" json:"-" query:"-"`
++}
++
++// GetName 实现上面 SVC 里用的接口
++func (p *CreateSpaceRequest) GetName() string {
++	if p == nil {
++		return ""
++	}
++	return p.Name
++}
++
++func (p *CreateSpaceRequest) GetDescription() string {
++	if p == nil {
++		return ""
++	}
++	return p.Description
++}
++
++// CreateSpaceResponse 创建团队空间的响应（复用 BotSpaceV2 作为 data）
++type CreateSpaceResponse struct {
++	Data *BotSpaceV2 `thrift:"data,1" form:"data" json:"data" query:"data"`
++	Code int32       `thrift:"code,2" form:"code" json:"code" query:"code"`
++	Msg  string      `thrift:"msg,3" form:"msg" json:"msg" query:"msg"`
++}
++
+ type GetSpaceListV2Request struct {
+ 	// Search term
+ 	SearchWord *string `thrift:"search_word,1,optional" form:"search_word" json:"search_word,omitempty" query:"search_word"`
+diff --git a/backend/api/router/coze/api.go b/backend/api/router/coze/api.go
+index 5f911d54..e53b9f38 100644
+--- a/backend/api/router/coze/api.go
++++ b/backend/api/router/coze/api.go
+@@ -342,6 +342,7 @@ func Register(r *server.Hertz) {
+ 			{
+ 				_space := _playground_api.Group("/space", _spaceMw()...)
+ 				_space.POST("/list", append(_getspacelistv2Mw(), coze.GetSpaceListV2)...)
++				_space.POST("/create", append(_getspacelistv2Mw(), coze.CreateTeamSpace)...) // 二次开发：创建团队空间（复用 list 的中间件）
+ 			}
+ 		}
+ 		{
+diff --git a/backend/application/user/user.go b/backend/application/user/user.go
+index cdac1e91..749ede57 100644
+--- a/backend/application/user/user.go
++++ b/backend/application/user/user.go
+@@ -238,6 +238,16 @@ func (u *UserApplicationService) GetSpaceListV2(ctx context.Context, req *playgr
+ 		return nil, err
+ 	}
+ 
++	// 统计团队空间数量（二次开发：开源版原本硬编码为 0）
++	teamNum := int32(0)
++	for _, sp := range spaces {
++		// SpaceType 1=个人空间，其余视为团队空间
++		if sp.SpaceType != entity.SpaceTypePersonal {
++			teamNum++
++		}
++	}
++	const maxTeamSpace = int32(100) // 二次开发放宽；原开源版为 0（不可创建）
++
+ 	botSpaces := langSlices.Transform(spaces, func(space *entity.Space) *playground.BotSpaceV2 {
+ 		return &playground.BotSpaceV2{
+ 			ID:          space.ID,
+@@ -252,7 +262,8 @@ func (u *UserApplicationService) GetSpaceListV2(ctx context.Context, req *playgr
+ 		Data: &playground.SpaceInfo{
+ 			BotSpaceList:          botSpaces,
+ 			HasPersonalSpace:      true,
+-			TeamSpaceNum:          0,
++			TeamSpaceNum:          teamNum,
++			MaxTeamSpaceNum:       maxTeamSpace,
+ 			RecentlyUsedSpaceList: botSpaces,
+ 			Total:                 ptr.Of(int32(len(botSpaces))),
+ 			HasMore:               ptr.Of(false),
+@@ -261,6 +272,31 @@ func (u *UserApplicationService) GetSpaceListV2(ctx context.Context, req *playgr
+ 	}, nil
+ }
+ 
++// CreateTeamSpace 创建团队空间（二次开发新增）
++//
++// 供「一个组织一个 space」的多租户模型使用。
++// 开源版原本只允许注册时自动生成个人空间，没有对外创建入口。
++func (u *UserApplicationService) CreateTeamSpace(ctx context.Context,
++	req *playground.CreateSpaceRequest) (resp *playground.CreateSpaceResponse, err error) {
++	uid := ctxutil.MustGetUIDFromCtx(ctx)
++
++	sp, err := u.DomainSVC.CreateTeamSpace(ctx, uid, req.GetName(), req.GetDescription())
++	if err != nil {
++		return nil, err
++	}
++
++	return &playground.CreateSpaceResponse{
++		Data: &playground.BotSpaceV2{
++			ID:          sp.ID,
++			Name:        sp.Name,
++			Description: sp.Description,
++			SpaceType:   playground.SpaceType(sp.SpaceType),
++			IconURL:     sp.IconURL,
++		},
++		Code: 0,
++	}, nil
++}
++
+ func (u *UserApplicationService) MGetUserBasicInfo(ctx context.Context, req *playground.MGetUserBasicInfoRequest) (
+ 	resp *playground.MGetUserBasicInfoResponse, err error,
+ ) {
+diff --git a/backend/domain/user/internal/dal/model/space.gen.go b/backend/domain/user/internal/dal/model/space.gen.go
+index 99b0bfd1..1bc5787e 100644
+--- a/backend/domain/user/internal/dal/model/space.gen.go
++++ b/backend/domain/user/internal/dal/model/space.gen.go
+@@ -18,6 +18,7 @@ type Space struct {
+ 	Description string         `gorm:"column:description;not null;comment:Space Description" json:"description"`                               // Space Description
+ 	IconURI     string         `gorm:"column:icon_uri;not null;comment:Icon URI" json:"icon_uri"`                                              // Icon URI
+ 	CreatorID   int64          `gorm:"column:creator_id;not null;comment:Creator ID" json:"creator_id"`                                        // Creator ID
++	SpaceType   int32          `gorm:"column:space_type;not null;default:1;comment:1=personal 2=team" json:"space_type"`               // 1=personal 2=team
+ 	CreatedAt   int64          `gorm:"column:created_at;not null;autoCreateTime:milli;comment:Creation Time (Milliseconds)" json:"created_at"` // Creation Time (Milliseconds)
+ 	UpdatedAt   int64          `gorm:"column:updated_at;not null;autoUpdateTime:milli;comment:Update Time (Milliseconds)" json:"updated_at"`   // Update Time (Milliseconds)
+ 	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;comment:Deletion Time (Milliseconds)" json:"deleted_at"`                               // Deletion Time (Milliseconds)
+diff --git a/backend/domain/user/service/user.go b/backend/domain/user/service/user.go
+index b2191615..9b89501d 100644
+--- a/backend/domain/user/service/user.go
++++ b/backend/domain/user/service/user.go
+@@ -79,6 +79,10 @@ type User interface {
+ 	ValidateSession(ctx context.Context, sessionKey string) (session *entity.Session, exist bool, err error)
+ 	GetUserSpaceList(ctx context.Context, userID int64) (spaces []*entity.Space, err error)
+ 	GetUserSpaceBySpaceID(ctx context.Context, spaceID []int64) (space []*entity.Space, err error)
++	// CreateTeamSpace 创建团队空间（多租户）
++	// ⚠️ 开源版原本只有注册时自动建的个人空间，没有对外入口。
++	//    这里是二次开发新增，用于「一个组织一个 space」的隔离模型。
++	CreateTeamSpace(ctx context.Context, userID int64, name, description string) (space *entity.Space, err error)
+ }
+ 
+ type SaasUserProvider interface {
+diff --git a/backend/domain/user/service/user_impl.go b/backend/domain/user/service/user_impl.go
+index 613a2dc4..eded2c42 100644
+--- a/backend/domain/user/service/user_impl.go
++++ b/backend/domain/user/service/user_impl.go
+@@ -249,6 +249,64 @@ func (u *userImpl) UpdateProfile(ctx context.Context, req *UpdateProfileRequest)
+ 	return nil
+ }
+ 
++// CreateTeamSpace 创建团队空间（二次开发新增）
++//
++// 复用已有的 SpaceRepo.CreateSpace / AddSpaceUser，与注册时建个人空间的逻辑一致，
++// 区别只在于：名字由调用方给，且创建者即 owner。
++func (u *userImpl) CreateTeamSpace(ctx context.Context, userID int64,
++	name, description string) (space *userEntity.Space, err error) {
++	if userID <= 0 {
++		return nil, fmt.Errorf("invalid user id")
++	}
++	if name == "" {
++		name = "Team Space"
++	}
++
++	sid, err := u.IDGen.GenID(ctx)
++	if err != nil {
++		return nil, fmt.Errorf("gen space_id failed: %w", err)
++	}
++
++	now := time.Now().UnixMilli()
++	err = u.SpaceRepo.CreateSpace(ctx, &model.Space{
++		ID:          sid,
++		Name:        name,
++		Description: description,
++		IconURI:     uploadEntity.EnterpriseIconURI,   // team_default_icon.png
++		SpaceType:   2,                                // 2 = 团队空间
++		OwnerID:     userID,
++		CreatorID:   userID,
++		CreatedAt:   now,
++		UpdatedAt:   now,
++	})
++	if err != nil {
++		return nil, fmt.Errorf("create team space failed: %w", err)
++	}
++
++	// 创建者自动成为 owner（role_type = 1）
++	err = u.SpaceRepo.AddSpaceUser(ctx, &model.SpaceUser{
++		SpaceID:   sid,
++		UserID:    userID,
++		RoleType:  1,
++		CreatedAt: now,
++		UpdatedAt: now,
++	})
++	if err != nil {
++		return nil, fmt.Errorf("add space owner failed: %w", err)
++	}
++
++	return &userEntity.Space{
++		ID:          sid,
++		Name:        name,
++		Description: description,
++		OwnerID:     userID,
++		CreatorID:   userID,
++		CreatedAt:   now,
++		UpdatedAt:   now,
++	}, nil
++}
++
++
+ func (u *userImpl) Create(ctx context.Context, req *CreateUserRequest) (user *userEntity.User, err error) {
+ 	exist, err := u.UserRepo.CheckEmailExist(ctx, req.Email)
+ 	if err != nil {
+@@ -505,7 +563,7 @@ func spacePo2Do(space *model.Space, iconUrl string) *userEntity.Space {
+ 		Name:        space.Name,
+ 		Description: space.Description,
+ 		IconURL:     iconUrl,
+-		SpaceType:   userEntity.SpaceTypePersonal,
++		SpaceType:   userEntity.SpaceType(space.SpaceType),  // 二次开发：读真实类型，原来写死 Personal
+ 		OwnerID:     space.OwnerID,
+ 		CreatorID:   space.CreatorID,
+ 		CreatedAt:   space.CreatedAt,
+diff --git a/docker/docker-compose.yml b/docker/docker-compose.yml
+index 73e4556c..6e80ecb8 100755
+--- a/docker/docker-compose.yml
++++ b/docker/docker-compose.yml
+@@ -223,17 +223,19 @@ services:
+       - -c
+       - |
+         # Run initialization in background
++        # ⚠️ Bitnami 镜像的 mc 在 /opt/bitnami/minio-client/bin/mc，补进 PATH
++        export PATH=$$PATH:/opt/bitnami/minio-client/bin
+         (
+           # Wait for MinIO to be ready
+-          until (/usr/bin/mc alias set localminio http://localhost:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}) do
++          until (mc alias set localminio http://localhost:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}) do
+             echo "Waiting for MinIO to be ready..."
+             sleep 1
+           done
+ 
+           # Create bucket and copy files
+-          /usr/bin/mc mb --ignore-existing localminio/$${STORAGE_BUCKET}
+-          /usr/bin/mc cp --recursive /default_icon/ localminio/$${STORAGE_BUCKET}/default_icon/
+-          /usr/bin/mc cp --recursive /official_plugin_icon/ localminio/$${STORAGE_BUCKET}/official_plugin_icon/
++          mc mb --ignore-existing localminio/$${STORAGE_BUCKET} || true
++          mc cp --recursive /default_icon/ localminio/$${STORAGE_BUCKET}/default_icon/ || true
++          mc cp --recursive /official_plugin_icon/ localminio/$${STORAGE_BUCKET}/official_plugin_icon/ || true
+ 
+           echo "MinIO initialization complete."
+         ) &
+@@ -244,11 +246,11 @@ services:
+       test:
+         [
+           'CMD-SHELL',
+-          '/usr/bin/mc alias set health_check http://localhost:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} && /usr/bin/mc ready health_check',
++          'export PATH=$$PATH:/opt/bitnami/minio-client/bin; mc alias set health_check http://localhost:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} >/dev/null 2>&1 && mc ready health_check',
+         ]
+-      interval: 30s
++      interval: 15s
+       timeout: 10s
+-      retries: 3
++      retries: 10
+       start_period: 30s
+     networks:
+       - coze-network

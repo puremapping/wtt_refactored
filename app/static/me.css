@@ -1,0 +1,130 @@
+/* 个人主页 */
+
+.me-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.me-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+
+/* 头部 */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.avatar {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #eef3ff, #f5f0ff);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-info { flex: 1; }
+.profile-info h2 { margin: 0 0 4px; font-size: 19px; }
+
+/* 页签 */
+.me-tabs {
+  display: flex; gap: 24px;
+  margin: 8px 0 16px;
+  border-bottom: 1px solid #eee;
+}
+.me-tab {
+  background: none; border: none;
+  padding: 10px 0; font-size: 15px;
+  color: #888; cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.me-tab.active {
+  color: #1a1a1a; font-weight: 600;
+  border-bottom-color: #1a1a1a;
+}
+
+.pane { min-height: 200px; }
+
+/* 回忆卡片 */
+.memory-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  border-left: 3px solid #4c8dff;
+}
+.mem-head {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 6px;
+}
+.mem-head b { font-size: 15px; }
+.mem-stat { font-size: 12px; color: #4c8dff; margin-bottom: 8px; }
+.mem-text {
+  font-size: 14px; color: #555; line-height: 1.6;
+  margin: 0 0 8px;
+}
+.mem-foot { font-size: 11px; color: #bbb; }
+
+/* 消息 */
+.msg-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.msg-item.unread { background: #f5f9ff; }
+.msg-type {
+  font-size: 11px; padding: 2px 8px;
+  background: #eef3ff; color: #4c8dff;
+  border-radius: 8px; flex-shrink: 0;
+}
+.msg-content { flex: 1; }
+
+/* 设置表单 */
+.field {
+  display: block; margin-bottom: 14px;
+}
+.field span {
+  display: block; font-size: 13px;
+  color: #777; margin-bottom: 5px;
+}
+.field input, .field textarea {
+  width: 100%; box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid #e0e0e0; border-radius: 8px;
+  font-size: 14px; outline: none;
+  font-family: inherit;
+}
+.field input:focus, .field textarea:focus {
+  border-color: #4c8dff;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  color: #999;
+  font-size: 14px;
+  line-height: 1.9;
+}
+.empty-state a { color: #4c8dff; }
+
+.del-btn {
+  background: none; border: none;
+  color: #bbb; font-size: 12px; cursor: pointer;
+}
+.del-btn:hover { color: #e5484d; }
+
+hr {
+  border: none; border-top: 1px solid #f0f0f0;
+  margin: 18px 0;
+}

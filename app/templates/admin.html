@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where to Travel — 数据看板</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+<style>
+  body { background: #f6f8fb; padding: 24px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #777; font-size: 13px; margin-bottom: 22px; }
+  .bar-top { display: flex; gap: 10px; align-items: center; margin-bottom: 20px;
+             flex-wrap: wrap; }
+  .bar-top input { padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px;
+                   font-size: 14px; }
+  .bar-top input#tok { width: 260px; }
+  .bar-top input#days { width: 80px; }
+  .bar-top button { padding: 9px 20px; border: none; border-radius: 8px;
+                    background: #4c8dff; color: #fff; font-size: 14px;
+                    cursor: pointer; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 14px; margin-bottom: 24px; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 18px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .card .k { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .card .v { font-size: 26px; font-weight: 700; color: #1a1a1a; }
+  section { background: #fff; border-radius: 10px; padding: 18px 20px;
+            margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  section h2 { font-size: 15px; margin: 0 0 14px; color: #333; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #f0f0f0; }
+  th { color: #888; font-weight: 600; font-size: 12px; }
+  .funnel-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .funnel-label { width: 110px; font-size: 13px; color: #555; }
+  .funnel-bar { height: 22px; background: linear-gradient(90deg,#4c8dff,#7aa9ff);
+                border-radius: 4px; min-width: 2px; }
+  .funnel-n { font-size: 13px; color: #333; font-weight: 600; }
+  .err { color: #b91c1c; font-size: 13px; }
+  .empty { color: #999; font-size: 13px; padding: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Where to Travel — 数据看板</h1>
+  <div class="sub">行为分析 · 仅供内部使用</div>
+
+  <div class="bar-top">
+    <input id="tok" type="password" placeholder="ADMIN_TOKEN">
+    <input id="days" type="number" value="30" min="1" max="365">
+    <span style="font-size:13px;color:#777">天内</span>
+    <button id="load">加载</button>
+    <span id="err" class="err"></span>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+
+async function load() {
+  const tok = $('#tok').value.trim();
+  const days = $('#days').value || 30;
+  $('#err').textContent = '';
+  $('#out').innerHTML = '<div class="empty">载入中……</div>';
+  try {
+    const r = await fetch(`/api/analytics/report?days=${days}&token=${encodeURIComponent(tok)}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || '请求失败');
+    render(d);
+  } catch (e) {
+    $('#err').textContent = e.message;
+    $('#out').innerHTML = '';
+  }
+}
+
+function render(d) {
+  const o = d.overview || {};
+  const f = d.funnel || {};
+  let html = '';
+
+  html += `<div class="cards">
+    ${card('总用户', o.total_users)}
+    ${card('新增用户', o.new_users)}
+    ${card('活跃用户', o.active_users)}
+    ${card('会话数', o.sessions)}
+    ${card('平均轮数', o.avg_turns)}
+  </div>`;
+
+  // 漏斗
+  html += `<section><h2>核心漏斗</h2>
+    ${funnel('对话', f.sessions_with_message, f.sessions_with_message)}
+    ${funnel('生成行程', f.generated, f.sessions_with_message)}
+    ${funnel('接受修改', f.proposal_accepted, f.sessions_with_message)}
+    ${funnel('拒绝修改', f.proposal_rejected, f.sessions_with_message)}
+    <div style="margin-top:12px;font-size:13px;color:#666">
+      生成率 ${f.gen_rate}% · 修改接受率 ${f.accept_rate}%
+    </div></section>`;
+
+  // 动机分布
+  html += `<section><h2>动机分布</h2>`;
+  if ((d.motivations || []).length) {
+    html += `<table><tr><th>动机</th><th>次数</th></tr>` +
+      d.motivations.map(m => `<tr><td>${esc(m.motivation)}</td><td>${m.n}</td></tr>`).join('') +
+      `</table>`;
+  } else html += '<div class="empty">暂无数据</div>';
+  html += `</section>`;
+
+  // 事件
+  html += `<section><h2>事件统计</h2>`;
+  if ((d.events || []).length) {
+    html += `<table><tr><th>事件</th><th>次数</th></tr>` +
+      d.events.map(e => `<tr><td>${esc(e.event_type)}</td><td>${e.n}</td></tr>`).join('') +
+      `</table>`;
+  } else html += '<div class="empty">暂无数据</div>';
+  html += `</section>`;
+
+  // 活跃用户
+  html += `<section><h2>用户活跃度</h2>`;
+  if ((d.top_users || []).length) {
+    html += `<table><tr><th>用户</th><th>会话</th><th>事件</th><th>最后活跃</th></tr>` +
+      d.top_users.map(u => `<tr><td>${esc(u.email)}</td><td>${u.sessions}</td>
+        <td>${u.events}</td><td>${esc((u.last_active || '').slice(0, 16))}</td></tr>`).join('') +
+      `</table>`;
+  } else html += '<div class="empty">暂无数据</div>';
+  html += `</section>`;
+
+  $('#out').innerHTML = html;
+}
+
+function card(k, v) {
+  return `<div class="card"><div class="k">${k}</div><div class="v">${v ?? 0}</div></div>`;
+}
+
+function funnel(label, n, total) {
+  const pct = total ? Math.max(2, (n / total) * 100) : 2;
+  return `<div class="funnel-row">
+    <div class="funnel-label">${label}</div>
+    <div class="funnel-bar" style="width:${pct * 4}px"></div>
+    <div class="funnel-n">${n ?? 0}</div>
+  </div>`;
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+$('#load').onclick = load;
+$('#tok').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
+</script>
+</body>
+</html>

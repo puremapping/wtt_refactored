@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的 · Where to Travel</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/browse.css?v=6">
+<link rel="stylesheet" href="/static/me.css?v=6">
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="logo">Where to Travel</a>
+  <div class="search-wrap">
+    <input id="search-input" type="text" placeholder="搜索城市、景点、灵感…">
+    <button id="btn-ai" class="ai-btn">AI</button>
+  </div>
+  <div class="topbar-right">
+    <a href="/chat" class="nav-item">对话</a>
+    <a href="/me" class="nav-item">我的</a>
+  </div>
+</header>
+
+<main class="me-wrap">
+  <!-- 未登录 -->
+  <div id="need-login" class="me-card hidden">
+    <p>登录后可以看到你的旅游回忆</p>
+    <button id="btn-gologin" class="primary">去登录</button>
+  </div>
+
+  <!-- 已登录 -->
+  <div id="me-content" class="hidden">
+    <section class="me-card profile-head">
+      <div class="avatar" id="avatar">🧳</div>
+      <div class="profile-info">
+        <h2 id="nickname">旅行者</h2>
+        <div class="dim" id="email-line"></div>
+        <div class="dim" id="city-line"></div>
+      </div>
+      <button id="btn-edit" class="ghost small">编辑资料</button>
+    </section>
+
+    <nav class="me-tabs">
+      <button class="me-tab active" data-pane="memories">旅游回忆</button>
+      <button class="me-tab" data-pane="posts">我发布的</button>
+      <button class="me-tab" data-pane="messages">消息</button>
+      <button class="me-tab" data-pane="settings">设置</button>
+    </nav>
+
+    <section id="pane-memories" class="pane">
+      <div id="memories-list"></div>
+    </section>
+
+    <section id="pane-posts" class="pane hidden">
+      <div id="my-posts" class="masonry"></div>
+    </section>
+
+    <section id="pane-messages" class="pane hidden">
+      <div id="messages-list"></div>
+    </section>
+
+    <section id="pane-settings" class="pane hidden">
+      <div class="me-card">
+        <h3>设置</h3>
+        <label class="field">
+          <span>昵称</span>
+          <input id="set-nickname" type="text">
+        </label>
+        <label class="field">
+          <span>所在城市</span>
+          <input id="set-city" type="text" placeholder="如：北京">
+        </label>
+        <label class="field">
+          <span>简介</span>
+          <textarea id="set-bio" rows="3" placeholder="一句话介绍自己"></textarea>
+        </label>
+        <button id="set-save" class="primary">保存</button>
+        <span id="set-msg" class="dim"></span>
+        <hr>
+        <button id="btn-logout" class="ghost">退出登录</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="/static/me.js?v=6"></script>
+</body>
+</html>

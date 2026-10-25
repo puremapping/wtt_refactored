@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · Where to Travel</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/browse.css?v=6">
+<link rel="stylesheet" href="/static/login.css?v=6">
+</head>
+<body class="login-body">
+
+<div class="login-shell">
+  <div class="login-side">
+    <a href="/" class="login-logo">Where to Travel</a>
+    <p class="login-slogan">不只告诉你「去哪」，<br>先帮你搞清楚「为什么去」。</p>
+    <ul class="login-feats">
+      <li>动机驱动的行程推荐</li>
+      <li>北京官方开放数据 + 高德能力</li>
+      <li>文旅局可开发本地智能体</li>
+    </ul>
+  </div>
+
+  <div class="login-main">
+    <h1 id="login-title">登录</h1>
+
+    <!-- 身份切换（仅注册时显示） -->
+    <div id="role-picker" class="role-picker hidden">
+      <div class="role-label">我是</div>
+      <div class="role-opts">
+        <button class="role-opt active" data-role="person">
+          <span class="role-ico">🧍</span>
+          <span class="role-name">个人用户</span>
+          <span class="role-desc">找行程、分享旅行</span>
+        </button>
+        <button class="role-opt" data-role="agency">
+          <span class="role-ico">🏛️</span>
+          <span class="role-name">文旅局</span>
+          <span class="role-desc">开发本地智能体</span>
+        </button>
+      </div>
+    </div>
+
+    <form id="login-form" autocomplete="off">
+      <label class="fld">
+        <span>邮箱</span>
+        <input id="f-email" type="email" placeholder="you@example.com"
+               autocomplete="email" required>
+      </label>
+
+      <label class="fld">
+        <span>密码</span>
+        <input id="f-password" type="password" placeholder="至少 6 位"
+               autocomplete="current-password" required>
+      </label>
+
+      <!-- 注册才有的字段 -->
+      <div id="reg-fields" class="hidden">
+        <label class="fld">
+          <span>昵称<span class="dim">(可选)</span></span>
+          <input id="f-nickname" type="text" placeholder="怎么称呼你">
+        </label>
+
+        <!-- 文旅局专属 -->
+        <div id="agency-fields" class="hidden">
+          <label class="fld">
+            <span>机构名称</span>
+            <input id="f-org" type="text" placeholder="如：成都市文化广电旅游局">
+          </label>
+          <label class="fld">
+            <span>覆盖地区<span class="dim">(主智能体按此路由)</span></span>
+            <input id="f-region" type="text" placeholder="如：成都">
+          </label>
+        </div>
+      </div>
+
+      <div id="login-error" class="login-error"></div>
+
+      <button type="submit" id="login-submit" class="primary full">登录</button>
+    </form>
+
+    <div class="login-foot">
+      <a href="#" id="mode-toggle">还没有账号？注册</a>
+      <a href="/" class="dim">先随便逛逛 →</a>
+    </div>
+
+    <p class="login-privacy dim">
+      匿名也能使用全部功能，登录后行程才会保存。
+    </p>
+  </div>
+</div>
+
+<script>
+  // 服务端传下来的初始值（模板注入）
+  window.__INITIAL__ = {
+    role: "{{ role }}",
+    next: "{{ next }}"
+  };
+</script>
+<script src="/static/login.js?v=6"></script>
+</body>
+</html>

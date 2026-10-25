@@ -1,0 +1,36 @@
+# ── 凭证（务必保留） ──────────────────────────────
+.env
+.env.local
+*.key
+*.pem
+
+# ── 数据（可由脚本重新生成） ─────────────────────
+.research/
+data/*.db
+data/*.db.bak-*
+data/*.db-wal
+data/*.db-shm
+*.xlsx
+*.xls
+!docs/**/*.xlsx
+
+# ── Python ───────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# ── 工具残留 ─────────────────────────────────────
+.chainlit/
+chainlit.md
+
+# ── 系统 ─────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ── 第三方参考代码（本地保留，不入库）─────────────
+# ITINERA: EMNLP 2024, GPL-3.0 — 仅作参考，不随仓库分发
+sandbox/ITINERA/

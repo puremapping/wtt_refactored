@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能体开发 · Where to Travel</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/browse.css?v=6">
+<link rel="stylesheet" href="/static/console.css?v=6">
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="logo">Where to Travel</a>
+  <div class="console-brand">
+    <span class="cons-tag">文旅局工作台</span>
+    <span class="cons-org" id="org-name">{{ user.org_name or user.nickname }}</span>
+  </div>
+  <div class="topbar-right">
+    <a href="/" class="nav-item">发现</a>
+    <a href="/chat" class="nav-item">对话</a>
+    <a href="/me" class="nav-item">{{ user.nickname }}</a>
+  </div>
+</header>
+
+<main class="console-wrap">
+  <div class="console-head">
+    <div>
+      <h1>我的智能体</h1>
+      <p class="dim">
+        覆盖地区决定主智能体把用户派到你这里。
+        <span class="dim">暂存于本平台，发布后可被调用。</span>
+      </p>
+    </div>
+    <button id="btn-new" class="primary">+ 新建智能体</button>
+  </div>
+
+  <div id="agent-list" class="agent-list"></div>
+</main>
+
+<!-- 新建 / 编辑弹窗 -->
+<div id="agent-modal" class="modal hidden">
+  <div class="modal-card agent-form">
+    <button class="modal-close" id="agent-close">×</button>
+    <h3 id="form-title">新建智能体</h3>
+
+    <label class="fld">
+      <span>名称</span>
+      <input id="a-name" type="text" placeholder="如：成都文旅助手">
+    </label>
+
+    <label class="fld">
+      <span>覆盖地区 <em>必填</em></span>
+      <input id="a-region" type="text" placeholder="如：成都">
+      <span class="hint">主智能体靠这个字段把用户路由给你</span>
+    </label>
+
+    <label class="fld">
+      <span>一句话介绍</span>
+      <input id="a-desc" type="text" placeholder="如：带你逛遍成都的慢生活">
+    </label>
+
+    <label class="fld">
+      <span>人设与话术 <em>必填</em></span>
+      <textarea id="a-prompt" rows="6"
+        placeholder="你是一个成都本地向导。用户想放松时，优先推荐巷子里的茶馆和郊野公园，避开人多的网红点…"></textarea>
+      <span class="hint">描述这个智能体该怎么说话、优先推什么</span>
+    </label>
+
+    <div id="form-error" class="login-error"></div>
+    <button id="form-save" class="primary full">保存</button>
+  </div>
+</div>
+
+<script>window.__ME__ = {{ user | tojson }};</script>
+<script src="/static/console.js?v=6"></script>
+</body>
+</html>

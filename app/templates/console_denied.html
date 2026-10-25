@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仅文旅局可用 · Where to Travel</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/browse.css?v=6">
+<link rel="stylesheet" href="/static/login.css?v=6">
+</head>
+<body class="login-body">
+
+<div class="login-shell">
+  <div class="login-side">
+    <a href="/" class="login-logo">Where to Travel</a>
+    <p class="login-slogan">文旅局可以<br>开发自己的智能体。</p>
+    <ul class="login-feats">
+      <li>填入本地景区与话术</li>
+      <li>设置覆盖地区</li>
+      <li>发布后被主智能体调用</li>
+    </ul>
+  </div>
+
+  <div class="login-main">
+    <h1>这个页面仅文旅局可用</h1>
+    <p class="dim" style="margin:0 0 22px;line-height:1.8;font-size:14px">
+      你当前的身份是<b>个人用户</b>。<br>
+      如果代表文旅局，可以升级为文旅局账号 —— 升级后个人身份仍然保留，
+      浏览行程、分享、消息都不受影响。
+    </p>
+
+    <label class="fld">
+      <span>机构名称</span>
+      <input id="up-org" type="text" placeholder="如：成都市文化广电旅游局">
+    </label>
+    <label class="fld">
+      <span>覆盖地区</span>
+      <input id="up-region" type="text" placeholder="如：成都">
+    </label>
+
+    <div id="up-error" class="login-error"></div>
+    <button id="up-btn" class="primary full">升级为文旅局</button>
+
+    <div class="login-foot">
+      <a href="/">返回首页</a>
+      <a href="/me">我的主页</a>
+    </div>
+  </div>
+</div>
+
+<script>
+async function post(path, body) {
+  const r = await fetch(path, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `请求失败 (${r.status})`);
+  return d;
+}
+
+document.getElementById('up-btn').onclick = async () => {
+  const org = document.getElementById('up-org').value.trim();
+  const region = document.getElementById('up-region').value.trim();
+  const err = document.getElementById('up-error');
+  const btn = document.getElementById('up-btn');
+
+  if (!org) { err.textContent = '请填写机构名称'; return; }
+  btn.disabled = true; err.textContent = '';
+  try {
+    await post('/api/auth/upgrade-agency', { org_name: org, region });
+    location.href = '/console';
+  } catch (e) {
+    err.textContent = e.message;
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where to Travel</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/browse.css?v=6">
+</head>
+<body>
+
+<!-- ── 顶栏（全局） ───────────────────────────── -->
+<header class="topbar">
+  <a href="/" class="logo">Where to Travel</a>
+
+  <div class="search-wrap">
+    <input id="search-input" type="text" placeholder="搜索城市、景点、灵感…"
+           autocomplete="off">
+    <button id="btn-ai" class="ai-btn" title="用 AI 问这个问题">AI</button>
+  </div>
+
+  <div class="topbar-right">
+    <a href="/chat" class="nav-item" id="nav-chat">对话</a>
+    <a href="/me" class="nav-item" id="nav-msg">消息<span id="msg-dot" class="dot hidden"></span></a>
+    <a href="/login" class="nav-item" id="nav-auth">登录</a>
+  </div>
+</header>
+
+<!-- ── 页签 ───────────────────────────────────── -->
+<nav class="tabs">
+  <button class="tab active" data-tab="content">内容</button>
+  <button class="tab" data-tab="inspiration">旅游灵感</button>
+  <button class="tab" data-tab="hot">今日热榜</button>
+</nav>
+
+<!-- ── 瀑布流 ─────────────────────────────────── -->
+<main id="feed" class="masonry"></main>
+
+<div id="loading" class="feed-state hidden">
+  <div class="spinner"></div>
+</div>
+<div id="empty" class="feed-state hidden">这里还没有内容</div>
+
+<!-- 帖子详情弹窗 -->
+<div id="post-modal" class="modal hidden">
+  <div class="modal-card post-detail">
+    <button class="modal-close" id="post-close">×</button>
+    <div id="post-body"></div>
+  </div>
+</div>
+
+<script src="/static/browse.js?v=6"></script>
+</body>
+</html>
