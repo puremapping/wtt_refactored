@@ -86,8 +86,26 @@ def test_build_itinerary_no_coords_filtered():
     assert it.risks
 
 
+def test_time2plan_covers_all_valid_hours():
+    """BUG-1 修复回归：画像允许 1-12 小时，档位表必须全覆盖"""
+    for h in range(1, 13):
+        assert h in itin.TIME2PLAN, f"{h} 小时档位缺失"
+
+
+def test_more_hours_more_stops_with_plentiful_candidates():
+    """BUG-1 修复回归：候选充足时，时长越长行程越满（12h 不得回落 6h 档）"""
+    # 10 个相互邻近的候选（约 30m 间距，同簇），交通耗时≈0，站数由时长决定
+    plenty = [cand(f"附近景点{i}", 116.3900 + i * 0.0003, 39.9100)
+              for i in range(10)]
+    c6 = len(itin.build_itinerary(plenty, "成就/完成", hours=6).stops)
+    c8 = len(itin.build_itinerary(plenty, "成就/完成", hours=8).stops)
+    c12 = len(itin.build_itinerary(plenty, "成就/完成", hours=12).stops)
+    assert c8 > c6
+    assert c12 > c8
+
+
 def test_more_hours_never_fewer_stops_current_range():
-    """1-8 小时档内：时长越长，站数不得减少（9-12h 的缺失档位是 BUG-1，Phase 2a 补测）"""
+    """1-8 小时档内：时长越长，站数不得减少"""
     counts = {}
     for h in (2, 4, 6, 8):
         it = itin.build_itinerary(CANDS, "成就/完成", hours=h)
@@ -126,17 +144,16 @@ def test_apply_replace_picks_same_district_first():
     assert "备选景点" in names
 
 
-@pytest.mark.xfail(reason="BUG-12: apply_modification 的 not target 检查挡在 add 分支之前，"
-                          "而工具定义明说「add 时省略 target」——该操作实际不可用。Phase 2a 修复",
-                   strict=True)
 def test_apply_add():
-    cur = _existing_itin()
+    """BUG-12 修复回归：add 不带 target 必须可用（12h 预算足够容纳第 6 站）"""
+    cur = itin.build_itinerary(CANDS, "成就/完成", hours=12).to_dict()
     before = len(cur["stops"])
     pool = CANDS + [cand("新增景点", 116.40, 39.91)]
     new = itin.apply_modification(cur, "add", candidates=pool,
-                                  motivation="成就/完成", hours=8)
+                                  motivation="成就/完成", hours=12)
     assert new is not None
     assert len(new["stops"]) == before + 1
+    assert "新增景点" in [s["name"] for s in new["stops"]]
 
 
 def test_apply_reorder_keeps_stops():
@@ -158,7 +175,7 @@ def test_apply_invalid_actions_return_none():
 
 
 def test_apply_regenerate_excludes_current_when_pool_sufficient():
-    """池子够时 regenerate 不得把现有站点带回来（池子耗尽的回退是 BUG-2，Phase 2a 补测）"""
+    """池子够时 regenerate 不得把现有站点带回来"""
     cur = _existing_itin()
     pool = CANDS + [
         cand("替代景点A", 116.40, 39.91),
@@ -172,3 +189,29 @@ def test_apply_regenerate_excludes_current_when_pool_sufficient():
     old_names = {s["name"] for s in cur["stops"]}
     new_names = {s["name"] for s in new["stops"]}
     assert not (old_names & new_names), "换一批不得出现旧站点"
+
+
+def test_apply_regenerate_empty_pool_fails_explicitly():
+    """BUG-2 修复回归：候选耗尽时明确失败，不得回退全量候选把旧站点排回来"""
+    cur = _existing_itin()
+    new = itin.apply_modification(cur, "regenerate", candidates=CANDS,
+                                  motivation="成就/完成", hours=8)
+    assert new is None
+
+
+def test_regen_exclude_plumbing():
+    """BUG-2 修复回归：main 的排除列表推导"""
+    from app.main import _regen_exclude
+
+    cur_itin = {"stops": [{"name": "故宫"}, {"name": "天坛"}]}
+
+    # 模型填了 reuse_existing → 排除全部现有站点
+    assert _regen_exclude("换一批", {"reuse_existing": True}, cur_itin) == ["故宫", "天坛"]
+    # 用户话带关键词（模型漏填 flag 的双保险）
+    assert _regen_exclude("这几个都不想去，重新来", {}, cur_itin) == ["故宫", "天坛"]
+    # 非重生成语义 → 不排除
+    assert _regen_exclude("帮我排个行程", {}, cur_itin) is None
+    assert _regen_exclude("随便", {"reuse_existing": False}, cur_itin) is None
+    # 无现有行程 → 不排除
+    assert _regen_exclude("换一批", {"reuse_existing": True}, None) is None
+    assert _regen_exclude("换一批", {"reuse_existing": True}, {"stops": []}) is None

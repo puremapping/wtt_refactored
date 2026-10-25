@@ -17,6 +17,8 @@ import math
 from dataclasses import dataclass, field
 
 # 时长(小时) → (景点数, 聚类阈值米)   —— 参考 ITINERA 的 TIME2NUM，按北京尺度调整
+# ⚠️ BUG-1 修复：必须覆盖 1-12 全档（画像允许的时长范围），
+#    否则 9-12 小时会回落到 6 小时档，用户给的时间越多行程反而越短。
 TIME2PLAN = {
     1: (3, 3000),
     2: (4, 4000),
@@ -26,6 +28,10 @@ TIME2PLAN = {
     6: (8, 7000),
     7: (9, 8000),
     8: (10, 8000),
+    9: (11, 9000),
+    10: (12, 9500),
+    11: (13, 10000),
+    12: (14, 10000),
 }
 DEFAULT_HOURS = 6
 
@@ -308,12 +314,27 @@ def apply_modification(itinerary_dict, action, target=None, candidates=None,
 
     if action == "regenerate":
         # 换一批：排除现有全部站点
+        # ⚠️ BUG-2 修复：候选耗尽时明确失败 —— 原实现 `pool or candidates`
+        #    会把用户刚拒绝的站点原样排回来，「换一批」等于没换。
         excl = [s["name"] for s in stops]
         pool = [c for c in (candidates or []) if c[0] not in excl]
-        return build_itinerary(pool or candidates, motivation, hours).to_dict()
+        if not pool:
+            return None
+        return build_itinerary(pool, motivation, hours).to_dict()
 
     if action == "reorder":
         return build_itinerary(base, motivation, hours).to_dict()
+
+    if action == "add":
+        # ⚠️ BUG-12 修复：add 不需要 target（工具定义明说「add 时省略」），
+        #    原实现把 not target 检查放在 add 之前，导致该操作必然失败。
+        used = {s["name"] for s in stops}
+        cand_pool = [c for c in (candidates or [])
+                     if c[0] not in used and c[4] is not None]
+        if not cand_pool:
+            return None
+        pool = base + [cand_pool[0]]
+        return build_itinerary(pool, motivation, hours).to_dict()
 
     if not target:
         return None
@@ -339,15 +360,6 @@ def apply_modification(itinerary_dict, action, target=None, candidates=None,
         else:
             pick = cand_pool[0]
         pool = [c if c[0] != target else pick for c in base]
-        return build_itinerary(pool, motivation, hours).to_dict()
-
-    if action == "add":
-        used = {s["name"] for s in stops}
-        cand_pool = [c for c in (candidates or [])
-                     if c[0] not in used and c[4] is not None]
-        if not cand_pool:
-            return None
-        pool = base + [cand_pool[0]]
         return build_itinerary(pool, motivation, hours).to_dict()
 
     return None

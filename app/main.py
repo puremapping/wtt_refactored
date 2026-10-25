@@ -240,7 +240,9 @@ async def chat(request: Request, user=Depends(current_user_optional)):
 
         if name == "generate_itinerary":
             try:
-                d = _do_generate_itinerary(sid, args.get("hours"), user_id=uid)
+                exclude = _regen_exclude(user_text, args, current_itinerary)
+                d = _do_generate_itinerary(sid, args.get("hours"),
+                                           exclude=exclude, user_id=uid)
                 result["itinerary"] = d
                 result["action"] = "generate"
                 ana.track(ana.EV_ITINERARY_GENERATED, sid, uid,
@@ -287,6 +289,29 @@ async def recommend(request: Request):
 
     items = rec_svc.recommend(mot, intensity, top_k)
     return {"motivation": mot, "items": [i.to_dict() for i in items]}
+
+
+# 「换一批」语义关键词 —— 用户不想再看到现有站点中的任何一个
+_REGEN_KEYWORDS = ("换一批", "重新生成", "重新来", "再来一版",
+                   "这几个都不想去", "都不想去", "换几个")
+
+
+def _regen_exclude(user_text, args, current_itinerary):
+    """「换一批」语义 → 返回要排除的现有站点名列表（BUG-2）
+
+    触发条件（其一）：
+      - 模型按工具定义填了 reuse_existing=true
+      - 用户话里带「换一批」类关键词（模型漏填 flag 的双保险）
+
+    无现有行程或非重生成语义 → None（正常生成，不排除）。
+    """
+    if not current_itinerary or not current_itinerary.get("stops"):
+        return None
+    wants_new = (args.get("reuse_existing")
+                 or any(k in (user_text or "") for k in _REGEN_KEYWORDS))
+    if not wants_new:
+        return None
+    return [s["name"] for s in current_itinerary["stops"]]
 
 
 def _load_profile(sid, user_id=None):
