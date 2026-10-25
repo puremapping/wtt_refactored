@@ -15,7 +15,9 @@ async function api(path, opts = {}) {
 function esc(s) {
   const d = document.createElement('div');
   d.textContent = s == null ? '' : String(s);
-  return d.innerHTML;
+  // 补引号转义（BUG-8）：textContent→innerHTML 不处理引号，
+  // 值插入 src="..."/value="..." 等属性时可被引号逃逸
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 let me = null;

@@ -21,8 +21,12 @@ TAB_INSPIRATION = "inspiration"
 TAB_HOT = "hot"
 
 
-def _row_to_post(r, viewer_id: str = None) -> dict:
-    """DB 行 → 对外的帖子 dict"""
+def _row_to_post(r, liked: bool = False) -> dict:
+    """DB 行 → 对外的帖子 dict
+
+    ⚠️ liked 由调用方批量查出后传入（BUG-4：原实现每帖单独开连接查
+    「我是否点过赞」，一页 20 帖 = 21 次连接，翻页越来越慢）。
+    """
     imgs = []
     if r["images"]:
         try:
@@ -36,13 +40,6 @@ def _row_to_post(r, viewer_id: str = None) -> dict:
             itin = json.loads(r["itinerary"])
         except json.JSONDecodeError:
             itin = None
-
-    liked = False
-    if viewer_id:
-        with connect() as conn:
-            liked = conn.execute(
-                "SELECT 1 FROM likes WHERE post_id=? AND user_id=?",
-                (r["id"], viewer_id)).fetchone() is not None
 
     return {
         "id": r["id"],
@@ -62,9 +59,20 @@ def _row_to_post(r, viewer_id: str = None) -> dict:
             "name": r["author_name"] or "旅行者",
             "avatar": r["author_avatar"],
         },
-        "liked": liked,
+        "liked": bool(liked),
         "itinerary": itin,
     }
+
+
+def _liked_set(conn, viewer_id: str, post_ids: list) -> set:
+    """一次查出当前用户对一批帖子的点赞集合（BUG-4：替代逐帖开连接查询）"""
+    if not viewer_id or not post_ids:
+        return set()
+    marks = ",".join("?" * len(post_ids))
+    rows = conn.execute(
+        f"SELECT post_id FROM likes WHERE user_id=? AND post_id IN ({marks})",
+        (viewer_id, *post_ids)).fetchall()
+    return {x["post_id"] for x in rows}
 
 
 def list_posts(tab: str = TAB_CONTENT, page: int = 1, size: int = 20,
@@ -81,8 +89,7 @@ def list_posts(tab: str = TAB_CONTENT, page: int = 1, size: int = 20,
     offset = max(0, (page - 1) * size)
 
     with connect() as conn:
-        if tab == TAB_HOT:
-            # 热榜：近 24h 搜索命中次数排序
+        if tab == TAB_HOT:            # 热榜：近 24h 搜索命中次数排序
             since = (datetime.now() - timedelta(hours=24)).isoformat()
             sql = """
                 SELECT p.*, u.nickname AS author_name, u.avatar_url AS author_avatar,
@@ -125,7 +132,10 @@ def list_posts(tab: str = TAB_CONTENT, page: int = 1, size: int = 20,
                 "SELECT COUNT(*)")
             total = conn.execute(count_sql, args).fetchone()[0]
 
-    items = [_row_to_post(r, viewer_id) for r in rows]
+        # 点赞标记一次批量查出（连接关闭前），渲染时查内存集合
+        liked_ids = _liked_set(conn, viewer_id, [x["id"] for x in rows])
+
+    items = [_row_to_post(r, r["id"] in liked_ids) for r in rows]
     return {"items": items, "page": page, "size": size, "total": total,
             "has_more": offset + len(items) < total}
 
@@ -140,7 +150,10 @@ def get_post(post_id: int, viewer_id: str = None) -> Optional[dict]:
         if not r:
             return None
         conn.execute("UPDATE posts SET views = views + 1 WHERE id = ?", (post_id,))
-    return _row_to_post(r, viewer_id)
+        liked = bool(conn.execute(
+            "SELECT 1 FROM likes WHERE post_id=? AND user_id=?",
+            (post_id, viewer_id)).fetchone()) if viewer_id else False
+    return _row_to_post(r, liked)
 
 
 def create_post(user_id: str, title: str, body: str = "", ptype: str = "content",

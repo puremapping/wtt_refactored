@@ -14,6 +14,7 @@ from pathlib import Path
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pytest-only")
 # 测试环境不该真调 LLM；config 只在显式构造 LLM() 时才检查 key
 os.environ.setdefault("GLM_API_KEY", "test-key-not-real")
+os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

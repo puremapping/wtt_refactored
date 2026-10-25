@@ -65,7 +65,9 @@ async function load() {
   $('#err').textContent = '';
   $('#out').innerHTML = '<div class="empty">载入中……</div>';
   try {
-    const r = await fetch(`/api/analytics/report?days=${days}&token=${encodeURIComponent(tok)}`);
+    const r = await fetch(`/api/analytics/report?days=${days}`, {
+      headers: { 'X-Admin-Token': tok }   // 凭证走请求头，不进访问日志
+    });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || '请求失败');
     render(d);
@@ -145,7 +147,9 @@ function funnel(label, n, total) {
 function esc(s) {
   const d = document.createElement('div');
   d.textContent = s == null ? '' : String(s);
-  return d.innerHTML;
+  // 补引号转义（BUG-8）：textContent→innerHTML 不处理引号，
+  // 值插入 src="..."/value="..." 等属性时可被引号逃逸
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 $('#load').onclick = load;

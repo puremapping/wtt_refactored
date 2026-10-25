@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.core.config import BASE_DIR
 from app.core.db import connect, init_db
+from app.core.ratelimit import SlidingWindowLimiter
 from app.services import auth as auth_svc
 from app.services import analytics as ana
 from app.services import itinerary as itin_svc
@@ -24,6 +25,12 @@ from app.services import narrative as nar_svc
 from app.services import recommend as rec_svc
 
 app = FastAPI(title="Where to Travel")
+
+# 限流器（BUG-7）：匿名严、登录宽；阈值可从 .env 调整
+_anon_limiter = SlidingWindowLimiter(
+    int(os.environ.get("RATE_LIMIT_ANON_PER_MIN", "20")), 60)
+_user_limiter = SlidingWindowLimiter(
+    int(os.environ.get("RATE_LIMIT_USER_PER_MIN", "60")), 60)
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app" / "static")),
           name="static")
@@ -195,7 +202,16 @@ async def chat(request: Request, user=Depends(current_user_optional)):
     AI 可以请求生成行程或提议修改，真正的执行由服务端做。
 
     ⚠️ 匿名（未登录）会话不落库，刷新即丢。
+    ⚠️ 限流（BUG-7）：每次对话真实消耗 GLM 费用，超配额返回 429。
+       阈值可用 .env 的 RATE_LIMIT_ANON_PER_MIN / RATE_LIMIT_USER_PER_MIN 调整。
     """
+    # 限流（先于任何 LLM 调用）
+    limiter = _user_limiter if user else _anon_limiter
+    limit_key = user["id"] if user else (
+        request.client.host if request.client else "unknown")
+    if not limiter.allow(limit_key):
+        return JSONResponse({"error": "请求太频繁，请稍后再试"}, status_code=429)
+
     body = await request.json()
     text = (body.get("text") or "").strip()
     sid = body.get("session_id") or None
@@ -486,9 +502,19 @@ async def modify_itinerary(request: Request, user=Depends(current_user_optional)
         new_it["assessment"] = cur.get("assessment", {})
 
     new_it["profile"] = profile
-    with connect() as conn:
-        conn.execute("UPDATE sessions SET itinerary=? WHERE id=?",
-                     (json.dumps(new_it, ensure_ascii=False), sid))
+    if uid:
+        # ⚠️ 加固-1：归属条件补齐 AND user_id=?（项目纪律：所有查询强制 user_id）
+        with connect() as conn:
+            conn.execute(
+                "UPDATE sessions SET itinerary=? WHERE id=? AND user_id=?",
+                (json.dumps(new_it, ensure_ascii=False), sid, uid))
+    else:
+        # ⚠️ BUG-9 修复：匿名会话只存在内存、数据库无此行 ——
+        #    原实现只写库，更新落空，下一轮对话 AI 看到的还是旧行程。
+        conv = convo_svc._anon_get(sid)
+        if conv:
+            conv.itinerary = new_it
+            convo_svc._anon_put(conv)
 
     new_it["session_id"] = sid
     return new_it
@@ -583,12 +609,15 @@ def delete_history(session_id: str, user=Depends(require_user)):
 # ⚠️ 简易保护：靠 ADMIN_TOKEN 环境变量。未设置则禁用（避免裸奔）
 
 @app.get("/api/analytics/report")
-def analytics_report(days: int = 30, token: str = None):
+def analytics_report(request: Request, days: int = 30, token: str = None):
     admin = os.environ.get("ADMIN_TOKEN", "")
     if not admin:
         return JSONResponse({"error": "未配置 ADMIN_TOKEN，分析接口已禁用"},
                             status_code=403)
-    if not hmac.compare_digest(token or "", admin):
+    # ⚠️ BUG-6：凭证优先走 X-Admin-Token 请求头（不进访问日志）；
+    # query 参数仅作旧调用兼容，日志里不再出现新凭证。
+    supplied = request.headers.get("X-Admin-Token") or token or ""
+    if not hmac.compare_digest(supplied, admin):
         return JSONResponse({"error": "token 不正确"}, status_code=403)
     return ana.report(days)
 

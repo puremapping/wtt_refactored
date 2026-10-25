@@ -45,13 +45,12 @@ EMBEDDING_DIM = 1024
 AMAP_KEY = os.environ.get("AMAP_KEY", "")
 
 # ---- 认证 ----
-# 用于签名 cookie。首次运行若 .env 里没有，自动生成一个并提示。
+# 用于签名登录 cookie。
+# ⚠️ BUG-5 修复：缺失不再随机生成（每次重启所有用户被静默登出），启动即报错。
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
-    import secrets as _secrets
-    SECRET_KEY = _secrets.token_hex(32)
-    # 提示写入 .env（不自动写，避免动用户文件）
-    import sys as _sys
-    print("[config] 警告：未设置 SECRET_KEY，本次使用临时值。"
-          "重启后 cookie 会失效。建议在 .env 加："
-          f"SECRET_KEY={SECRET_KEY}", file=_sys.stderr)
+    raise RuntimeError(
+        "[config] 缺少 SECRET_KEY —— 登录 cookie 的签名密钥。\n"
+        "  不设置的话每次重启服务所有人都会被登出，因此拒绝启动。\n"
+        "  生成并追加到 .env：\n"
+        "    python -c \"import secrets; print('SECRET_KEY=' + secrets.token_hex(32))\" >> .env")

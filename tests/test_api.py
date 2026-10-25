@@ -3,6 +3,7 @@
 覆盖：注册/登录态、用户数据隔离、帖子权限、未登录拦截。
 对话与行程生成接口涉及 LLM，不在本层测（编排层已用 FakeLLM 覆盖）。
 """
+import os
 import uuid
 
 import pytest
@@ -122,6 +123,44 @@ def test_like_toggle(client):
     assert r.json() == {"liked": False, "likes": 0}
 
 
+def test_liked_flag_per_viewer(client):
+    """BUG-4 修复回归：列表的 liked 按查看者标记（批量查询后行为不变）"""
+    email_a, _ = _register(client)                 # A
+    r = client.post("/api/posts", json={"title": "标记测试"})
+    post_id = r.json()["id"]
+
+    _register(client)                              # 当前登录态 = B
+    client.post(f"/api/posts/{post_id}/like")
+
+    items = {i["id"]: i for i in client.get("/api/posts").json()["items"]}
+    assert items[post_id]["liked"] is True         # B 点过赞
+
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"email": email_a, "password": "secret123"})
+    items = {i["id"]: i for i in client.get("/api/posts").json()["items"]}
+    assert items[post_id]["liked"] is False        # A 没点过
+
+
+def test_analytics_token_via_header(client):
+    """BUG-6 修复回归：看板凭证走 X-Admin-Token 请求头"""
+    real = os.environ.get("ADMIN_TOKEN", "")
+    assert real, "测试环境必须配置 ADMIN_TOKEN"
+    # 无 token → 403
+    r = client.get("/api/analytics/report?days=7")
+    assert r.status_code == 403
+    # 请求头 → 200
+    r = client.get("/api/analytics/report?days=7",
+                   headers={"X-Admin-Token": real})
+    assert r.status_code == 200
+    # 错误 token → 403
+    r = client.get("/api/analytics/report?days=7",
+                   headers={"X-Admin-Token": "wrong"})
+    assert r.status_code == 403
+    # 旧式 query 参数仍兼容（仅过渡期）
+    r = client.get(f"/api/analytics/report?days=7&token={real}")
+    assert r.status_code == 200
+
+
 def test_inspiration_post_requires_itinerary(client):
     _register(client)
     r = client.post("/api/posts", json={"title": "灵感帖", "type": "inspiration"})
@@ -138,6 +177,56 @@ def test_anonymous_can_browse_posts(client):
     assert r.status_code == 200
     r = client.get("/api/search/hot_keywords")
     assert r.status_code == 200
+
+
+def test_anonymous_modify_updates_memory_session(client, tmp_db, monkeypatch):
+    """BUG-9 修复回归：匿名用户确认修改后，内存会话里的行程必须更新
+
+    （原实现只写库，匿名会话库里无行 → 更新落空，下一轮对话 AI 看到旧行程）
+    """
+    # 叙述/评估需要真 LLM —— 替换为桩，专注测数据流
+    from app.services import narrative as nar_svc
+    monkeypatch.setattr(nar_svc, "narrate", lambda d, m, **kw: "（测试叙述）")
+    monkeypatch.setattr(nar_svc, "assess", lambda d, **kw: {
+        "intensity": "中", "strength": "", "suggestion": ""})
+
+    import sqlite3
+    conn = sqlite3.connect(db_module.DB_PATH)
+    conn.execute(
+        "INSERT INTO attractions (id,name,city,level,district,lon,lat,ticket_free) "
+        "VALUES (1,'故宫博物院','北京','5A','东城区',116.397,39.918,1),"
+        "(2,'天坛公园','北京','5A','东城区',116.410,39.882,1),"
+        "(3,'景山公园','北京','4A','西城区',116.394,39.925,1)")
+    conn.execute("INSERT INTO transport (attraction_name,district,metro) "
+                 "VALUES ('故宫博物院','东城区','地铁1号线'),"
+                 "('天坛公园','东城区','地铁5号线'),"
+                 "('景山公园','西城区','地铁1号线')")
+    conn.commit()
+    conn.close()
+
+    from app.services import cities as cities_svc
+    cities_svc.invalidate()
+
+    # 1. 匿名生成行程（不登录 → 内存会话）
+    r = client.post("/api/itinerary", json={"hours": 4})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    sid = d["session_id"]
+    assert d["stops"], "测试前提：生成的行程有站点"
+
+    # 2. 匿名确认修改（删掉第一站）
+    target = d["stops"][0]["name"]
+    r = client.post("/api/itinerary/modify", json={
+        "session_id": sid, "action": "remove", "target": target})
+    assert r.status_code == 200, r.text
+    new_names = [s["name"] for s in r.json()["stops"]]
+    assert target not in new_names
+
+    # 3. 关键断言：内存会话里的行程已被更新（BUG-9 修的就是这一步）
+    from app.services import conversation as convo
+    conv = convo._anon_get(sid)
+    assert conv is not None and conv.itinerary
+    assert target not in [s["name"] for s in conv.itinerary["stops"]]
 
 
 # ── 只读接口 ──
