@@ -635,7 +635,36 @@ def chat(session_id: Optional[str], user_text: str,
     except Exception as e:
         extract_error = f"{type(e).__name__}: {e}"
 
-    # 4. 生成回复（独立调用，带 tools，可能返回 tool_calls）
+    # 4. 合并画像（先做证据校验，拦掉模型瞎补的字段）
+    # ⚠️ BUG-11 修复：合并必须发生在回复生成之前 —— 否则回复上下文、
+    #    强制补调参数、兜底回复、数据边界检查读到的都是上一轮画像，
+    #    用户本轮刚说的话对它们全部不可见（与 v0.6 数据边界时序问题同族）。
+    user_text_all = _all_user_text(conv)
+    filtered = {}
+    for k, v in (new_profile or {}).items():
+        if k in _FIELD_EVIDENCE and not _has_evidence(k, user_text_all):
+            continue          # 用户没说，拒绝这个字段
+        # 清洗：占位词（「未知」「不确定」「无」…）不该进画像
+        if isinstance(v, str):
+            v = _clean_field_value(v)
+            if not v:
+                continue
+        elif isinstance(v, list):
+            v = [x for x in (_clean_field_value(i) for i in v) if x]
+            if not v:
+                continue
+        filtered[k] = v
+    conv.profile = _merge_profile(conv.profile, filtered)
+
+    if extract_error:
+        conv.profile["_extract_error"] = extract_error
+    # 记录轮数（供 ready 判据用；不对外暴露）
+    conv.profile["_turns"] = conv.turn
+
+    # 5. 服务端判据（不信 LLM 自报）
+    conv.ready = _is_ready(conv.profile)
+
+    # 6. 生成回复（独立调用，带 tools，可能返回 tool_calls）
     reply = ""
     tool_calls = []
     try:
@@ -685,13 +714,8 @@ def chat(session_id: Optional[str], user_text: str,
     # ⚠️ 数据边界拦截：只有数据覆盖的城市
     # 实测教训：模型会声称「我有上海的数据」并给出北京行程（静默错误）。
     # 光靠 prompt 告知无效，必须服务端硬拦。
-    # ⚠️ 且必须先清洗 —— 模型会把「未知」当目的地填进来，不能当「一个叫未知的城市」。
-    # ⚠️ 关键时序：合并画像在下面第 5 步，此处 conv.profile 还是**上一轮**的值。
-    #    必须优先用本轮新抽到的 destination，否则「这轮才说上海」会被漏拦。
-    dest = _clean_field_value(
-        new_profile.get("destination")
-        if isinstance(new_profile, dict) and new_profile.get("destination")
-        else conv.profile.get("destination"))
+    # ⚠️ 画像已在第 4 步合并，conv.profile 里就是本轮最新目的地（含占位词清洗）。
+    dest = _clean_field_value(conv.profile.get("destination"))
     blocked = bool(dest) and not _is_supported_destination(dest)
 
     # 反向补齐：用户明确要求生成，但模型没调工具 → 强制补上
@@ -720,32 +744,6 @@ def chat(session_id: Optional[str], user_text: str,
     if not reply:
         # 模型返回 tool_calls 时 content 常为空 —— 不能直接兜底成「能再多说说吗」
         reply = _fallback_reply(tool_calls, conv)
-
-    # 5. 合并画像（先做证据校验，拦掉模型瞎补的字段）
-    user_text_all = _all_user_text(conv)
-    filtered = {}
-    for k, v in (new_profile or {}).items():
-        if k in _FIELD_EVIDENCE and not _has_evidence(k, user_text_all):
-            continue          # 用户没说，拒绝这个字段
-        # 清洗：占位词（「未知」「不确定」「无」…）不该进画像
-        if isinstance(v, str):
-            v = _clean_field_value(v)
-            if not v:
-                continue
-        elif isinstance(v, list):
-            v = [x for x in (_clean_field_value(i) for i in v) if x]
-            if not v:
-                continue
-        filtered[k] = v
-    conv.profile = _merge_profile(conv.profile, filtered)
-
-    if extract_error:
-        conv.profile["_extract_error"] = extract_error
-    # 记录轮数（供 ready 判据用；不对外暴露）
-    conv.profile["_turns"] = conv.turn
-
-    # 6. 服务端判据（不信 LLM 自报）
-    conv.ready = _is_ready(conv.profile)
 
     conv.messages.append({"role": "assistant", "content": reply})
     conv.tool_calls = tool_calls          # 供上层执行

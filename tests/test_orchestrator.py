@@ -171,10 +171,8 @@ def test_forced_generate_when_model_misses_intent(seed_beijing):
     assert "排" in conv.messages[-1]["content"]
 
 
-@pytest.mark.xfail(reason="BUG-11: 强制补调发生在画像合并之前，"
-                          "用户本轮才说的 hours 会丢（与 v0.6 数据边界时序同类）。Phase 2a 修复",
-                   strict=True)
 def test_forced_generate_carries_same_turn_hours(seed_beijing):
+    """BUG-11 修复回归：本轮刚说的 hours 必须进强制补调参数"""
     fake = FakeLLM(extract={"hours": 8}, replies=[text_msg("好的，知道了。")])
     conv = convo.chat(None, "帮我排个行程，能玩一天 8 小时", llm=fake)
     assert conv.tool_calls[0]["args"].get("hours") == 8
@@ -198,11 +196,8 @@ def test_anonymous_session_roundtrip_in_memory(seed_beijing):
     assert c2.profile["primary"] == "美食/感官"
 
 
-@pytest.mark.xfail(reason="BUG-11 同族：兜底回复在画像合并之前读 conv.profile，"
-                          "本轮抽取的动机/时长对兜底不可见。Phase 2a 修复",
-                   strict=True)
 def test_fallback_reply_when_content_empty_and_no_tools(seed_beijing):
-    """正文空且无工具 → 兜底要给实质内容（有动机问缺口，没动机问动机）"""
+    """正文空且无工具 → 兜底要给实质内容（BUG-11 修复回归：兜底能看到本轮抽取）"""
     fake = FakeLLM(extract={}, replies=[text_msg("")])
     c1 = convo.chat(None, "嗯", llm=fake)
     assert "为什么" in c1.messages[-1]["content"] or "出去" in c1.messages[-1]["content"]
