@@ -22,14 +22,19 @@ router = APIRouter(tags=["itinerary"])
 
 @router.post("/api/recommend")
 async def recommend(request: Request):
-    """按动机推荐景区"""
+    """按动机推荐景区
+
+    body 可选 city：限定城市（多城隔离，Phase 2c）；缺省 = 全部城市。
+    """
     body = await request.json()
     mot = body.get("motivation") or "探索/新奇"
     intensity = int(body.get("intensity") or 3)
     top_k = int(body.get("top_k") or 8)
+    city = body.get("city") or None
 
-    items = rec_svc.recommend(mot, intensity, top_k)
-    return {"motivation": mot, "items": [i.to_dict() for i in items]}
+    items = rec_svc.recommend(mot, intensity, top_k, city=city)
+    return {"motivation": mot, "city": city or "",
+            "items": [i.to_dict() for i in items]}
 
 
 @router.post("/api/itinerary")

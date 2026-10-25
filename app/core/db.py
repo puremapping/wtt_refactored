@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS transport (
     branch_road TEXT,
     airport     TEXT,
     railway     TEXT,
-    town        TEXT
+    town        TEXT,
+    city        TEXT NOT NULL DEFAULT '北京'   -- ★ 城市维度（多城数据隔离）
 );
 
 -- 景区饱和指数（实时人流）
@@ -49,7 +50,8 @@ CREATE TABLE IF NOT EXISTS crowd_index (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
     saturation  REAL,
-    ts          TEXT
+    ts          TEXT,
+    city        TEXT NOT NULL DEFAULT '北京'   -- ★ 城市维度（同名景点跨城不串数据）
 );
 
 -- ── 用户系统（v0.4）──
@@ -238,6 +240,31 @@ def _migrate(conn):
 
     _migrate_events_notnull(conn)
     _migrate_attractions_city(conn)
+    _migrate_city_columns(conn)
+
+
+def _migrate_city_columns(conn):
+    """给 transport / crowd_index 补 city 列（Phase 2c 多城市隔离）
+
+    与 attractions.city 同一套策略：
+      - 老库 ALTER TABLE ADD COLUMN，回填 DEFAULT_CITY，迁移幂等
+      - join 时按 (名称, 城市) 匹配 —— 两城同名景点绝不串数据
+    """
+    from app.services.cities import DEFAULT_CITY
+
+    for table in ("transport", "crowd_index"):
+        # 用索引取列名（本函数可能在无 row_factory 的裸连接上被调用）
+        tcols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if not tcols:
+            continue                      # 表不存在
+        if "city" not in tcols:
+            conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN city TEXT NOT NULL DEFAULT '{DEFAULT_CITY}'")
+            continue
+        # 列已存在但有空值 → 回填
+        conn.execute(
+            f"UPDATE {table} SET city=? WHERE city IS NULL OR city = ''",
+            (DEFAULT_CITY,))
 
 
 def _migrate_attractions_city(conn):

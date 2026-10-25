@@ -8,6 +8,7 @@
 import json
 
 from app.core.db import connect
+from app.services import cities as cities_svc
 from app.services import conversation as convo_svc
 from app.services import itinerary as itin_svc
 from app.services import narrative as nar_svc
@@ -44,15 +45,22 @@ def load_profile(sid, user_id=None):
     return convo_svc.public_profile(conv.profile) if conv else {}
 
 
-def build_candidates(profile):
-    """按画像构造候选景区列表（推荐 + 排除 avoid + 必去置顶）"""
+def build_candidates(profile, city=None):
+    """按画像构造候选景区列表（推荐 + 排除 avoid + 必去置顶）
+
+    ⚠️ city（Phase 2c 多城市隔离）：传入时只取该城市的景区；
+    未传时从画像目的地解析（解析不出默认景区最多的城市），
+    多城数据下行程候选绝不混城市。
+    """
+    if city is None:
+        city = _resolve_plan_city(profile)
     mot = profile.get("primary") or "探索/新奇"
     try:
         intensity = int(profile.get("primary_intensity") or 3)
     except (ValueError, TypeError):
         intensity = 3
 
-    items = rec_svc.recommend(mot, intensity, top_k=25)
+    items = rec_svc.recommend(mot, intensity, top_k=25, city=city)
 
     avoid = [str(a) for a in (profile.get("avoid") or [])]
     must = [str(m) for m in (profile.get("must_see") or [])]
@@ -65,12 +73,30 @@ def build_candidates(profile):
         items.sort(key=lambda x: (not _is_must(x), -x.score))
 
     with connect() as conn:
+        sql = "SELECT attraction_name, metro FROM transport"
+        args = []
+        if city:
+            sql += " WHERE city=?"
+            args.append(city)
         metro_map = {r["attraction_name"]: r["metro"] or ""
-                     for r in conn.execute(
-                         "SELECT attraction_name, metro FROM transport")}
+                     for r in conn.execute(sql, args)}
 
     return [(i.name, i.level, i.district, i.address, i.lon, i.lat,
              i.crowd, metro_map.get(i.name, ""), i.reasons) for i in items]
+
+
+def _resolve_plan_city(profile):
+    """画像目的地 → 计划城市（Phase 2c）
+
+    解析不出时默认景区最多的城市 —— 多城数据下行程绝不能混城市。
+    （对话层已拦掉不支持的城市，能走到这里的目的地要么空要么可解析。）
+    """
+    dest = (profile.get("destination") or "").strip()
+    city = cities_svc.resolve_city(dest) if dest else None
+    if city is None:
+        names = cities_svc.city_names()
+        city = names[0] if names else None
+    return city
 
 
 def generate_itinerary(sid, hours_override=None, exclude=None, user_id=None):
@@ -81,10 +107,12 @@ def generate_itinerary(sid, hours_override=None, exclude=None, user_id=None):
     profile = load_profile(sid, user_id)
     mot = profile.get("primary") or "探索/新奇"
     hours = hours_override or profile.get("hours")
+    city = _resolve_plan_city(profile)
 
-    cand = build_candidates(profile)
+    cand = build_candidates(profile, city=city)
     it = itin_svc.build_itinerary(cand, mot, hours, exclude=exclude)
     d = it.to_dict()
+    d["city"] = city or ""
 
     try:
         d["narrative"] = nar_svc.narrate(d, mot, profile=profile)

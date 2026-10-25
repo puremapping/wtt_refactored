@@ -122,8 +122,8 @@ def import_transport(conn):
         conn.execute(
             """INSERT INTO transport
                (attraction_name,district,level,metro,bus,highway,
-                branch_road,airport,railway,town)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""", vals)
+                branch_road,airport,railway,town,city)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""", vals + ("北京",))
         n += 1
     print(f"  → 导入 transport: {n}")
     return n
@@ -159,8 +159,8 @@ def import_crowd(conn, limit=None):
     n = 0
     for name, (sat, ts) in latest.items():
         conn.execute(
-            "INSERT INTO crowd_index (name,saturation,ts) VALUES (?,?,?)",
-            (name, sat, ts))
+            "INSERT INTO crowd_index (name,saturation,ts,city) VALUES (?,?,?,?)",
+            (name, sat, ts, "北京"))
         n += 1
     print(f"  → 导入 crowd_index: {n}")
     return n

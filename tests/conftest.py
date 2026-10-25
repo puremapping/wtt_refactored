@@ -65,11 +65,11 @@ def seed_beijing(tmp_db):
             "VALUES (?,?,?,?,?,?,?,1)",
             (i, name, "北京", level, district, lon, lat))
         conn.execute(
-            "INSERT INTO transport (attraction_name,district,metro) VALUES (?,?,?)",
-            (name, district, "地铁4号线" if i % 2 else ""))
+            "INSERT INTO transport (attraction_name,city,district,metro) VALUES (?,?,?,?)",
+            (name, "北京", district, "地铁4号线" if i % 2 else ""))
         conn.execute(
-            "INSERT INTO crowd_index (name,saturation,ts) VALUES (?,?,?)",
-            (name, 30.0 + i * 5, "2026-10-25T10:00:00"))
+            "INSERT INTO crowd_index (name,city,saturation,ts) VALUES (?,?,?,?)",
+            (name, "北京", 30.0 + i * 5, "2026-10-25T10:00:00"))
     conn.commit()
     conn.close()
     cities_svc.invalidate()

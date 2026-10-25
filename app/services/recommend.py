@@ -103,6 +103,7 @@ class Scored:
     has_metro: bool
     lon: float | None = None
     lat: float | None = None
+    city: str = ""
     score: float = 0.0
     reasons: list = field(default_factory=list)
 
@@ -113,7 +114,7 @@ class Scored:
             "ticket_free": self.ticket_free,
             "price_high": self.price_high, "price_low": self.price_low,
             "crowd": self.crowd, "has_metro": self.has_metro,
-            "lon": self.lon, "lat": self.lat,
+            "lon": self.lon, "lat": self.lat, "city": self.city,
             "score": round(self.score, 3), "reasons": self.reasons,
         }
 
@@ -128,21 +129,34 @@ def _norm_crowd(crowd):
     return min(1.0, max(0.0, crowd / 100.0))
 
 
-def load_candidates(limit=None):
-    """从库里取候选景区（含饱和指数、地铁信息、坐标）"""
+def load_candidates(city: str = None, limit=None):
+    """从库里取候选景区（含饱和指数、地铁信息、坐标）
+
+    ⚠️ city（Phase 2c 多城市隔离）：
+      - 传入时只取该城市的景区
+      - transport / crowd_index 的 join 带 (名称, 城市) 双条件 ——
+        两城同名景点的交通与人流数据绝不互相串
+    """
     sql = """
         SELECT a.id, a.name, a.level, a.district, a.address,
                a.ticket_free, a.price_high, a.price_low,
-               a.lon, a.lat,
+               a.lon, a.lat, a.city,
                c.saturation AS crowd,
                t.metro
         FROM attractions a
-        LEFT JOIN crowd_index c ON c.name = a.name
-        LEFT JOIN transport  t ON t.attraction_name = a.name
+        LEFT JOIN crowd_index c
+               ON c.name = a.name AND c.city = a.city
+        LEFT JOIN transport  t
+               ON t.attraction_name = a.name AND t.city = a.city
     """
+    args = []
+    if city:
+        sql += " WHERE a.city = ?"
+        args.append(city)
+
     out = []
     with connect() as conn:
-        for r in conn.execute(sql):
+        for r in conn.execute(sql, args):
             out.append(Scored(
                 id=r["id"], name=r["name"], level=r["level"] or "",
                 district=r["district"] or "", address=r["address"] or "",
@@ -151,6 +165,7 @@ def load_candidates(limit=None):
                 crowd=r["crowd"],
                 has_metro=bool(r["metro"] and str(r["metro"]).strip()),
                 lon=r["lon"], lat=r["lat"],
+                city=r["city"] or "",
             ))
     return out[:limit] if limit else out
 
@@ -218,9 +233,13 @@ def score_one(item: Scored, motivation: str, intensity: int) -> Scored:
     return item
 
 
-def recommend(motivation: str, intensity: int = 3, top_k: int = 10):
-    """主入口：返回按动机排序的景区列表"""
-    items = load_candidates()
+def recommend(motivation: str, intensity: int = 3, top_k: int = 10,
+              city: str = None):
+    """主入口：返回按动机排序的景区列表
+
+    city：限定城市（Phase 2c）。None = 全部城市（调试接口用）。
+    """
+    items = load_candidates(city=city)
     scored = [score_one(i, motivation, intensity) for i in items]
     # 有理由的排前面，再按分数
     scored.sort(key=lambda x: (-x.score, -len(x.reasons)))
