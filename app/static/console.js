@@ -23,8 +23,33 @@ function esc(s) {
 
 let editing = null;   // 正在编辑的智能体，null = 新建
 
+const KIND_LABEL = { builtin: '平台内自建', external: '外部智能体' };
+
+/** 按类型切换表单可见字段 + 提示语 */
+function applyKind(kind, isEdit) {
+  const k = kind === 'external' ? 'external' : 'builtin';
+  $('#fld-builtin').classList.toggle('hidden', k !== 'builtin');
+  $('#fld-external').classList.toggle('hidden', k !== 'external');
+  $('#kind-hint').textContent = k === 'external'
+    ? '外部智能体：你的智能体在别处（Dify / Coze / 自建），我们只负责转发'
+    : '平台内自建：零额外部署，填一段人设就能回答';
+  // ⚠️ 类型定了不让改（后端 update_agent 也不接受 kind）——
+  //    两条轨的准入条件不同，中途换轨会让原本合法的记录变成不合法
+  $('#a-kind').disabled = !!isEdit;
+  if (isEdit) {
+    $('#kind-hint').textContent += '　（类型创建后不可修改）';
+  }
+}
+
 function card(a) {
   const pub = a.status === 'published';
+  const kind = a.kind === 'external' ? 'external' : 'builtin';
+  const body = kind === 'external'
+    ? `<p class="ag-prompt">🔗 ${esc(a.endpoint || '未填写调用地址')}
+         ${a.has_auth ? '　🔑 已设置鉴权' : '　（无鉴权）'}</p>`
+    : (a.prompt
+        ? `<p class="ag-prompt">${esc(a.prompt.slice(0, 90))}${a.prompt.length > 90 ? '…' : ''}</p>`
+        : '');
   return `
     <div class="agent-card ${pub ? 'is-pub' : ''}" data-id="${a.id}">
       <div class="ag-head">
@@ -33,9 +58,12 @@ function card(a) {
           ${pub ? '已发布' : '草稿'}
         </span>
       </div>
-      <div class="ag-region">📍 ${esc(a.region || '未设置覆盖地区')}</div>
+      <div class="ag-region">
+        📍 ${esc(a.region || '未设置覆盖地区')}
+        <span class="ag-kind kind-${kind}">${KIND_LABEL[kind]}</span>
+      </div>
       ${a.description ? `<p class="ag-desc">${esc(a.description)}</p>` : ''}
-      ${a.prompt ? `<p class="ag-prompt">${esc(a.prompt.slice(0, 90))}${a.prompt.length > 90 ? '…' : ''}</p>` : ''}
+      ${body}
       <div class="ag-foot">
         <button class="ag-btn" data-act="edit">编辑</button>
         ${pub ? '' : `<button class="ag-btn primary-mini" data-act="publish">发布</button>`}
@@ -104,10 +132,25 @@ function openForm(item) {
   $('#a-region').value = item?.region || '';
   $('#a-desc').value = item?.description || '';
   $('#a-prompt').value = item?.prompt || '';
+  $('#a-endpoint').value = item?.endpoint || '';
+  // 后端不回传 auth 明文。编辑时留空 = 不改；填了才覆盖；勾「清除」才清空
+  $('#a-auth').value = '';
+  $('#a-auth').checked = false;
+  $('#a-auth-clear').checked = false;
+  $('#a-auth').placeholder = item?.has_auth ? '已设置（留空则不修改）' : 'Bearer sk-xxxxx';
+  // 只有「原本就有鉴权」时才给清除入口
+  $('#auth-clear-row').classList.toggle('hidden', !item?.has_auth);
+
+  const kind = item?.kind === 'external' ? 'external' : 'builtin';
+  $('#a-kind').value = kind;
+  applyKind(kind, !!item);
+
   $('#form-error').textContent = '';
   $('#agent-modal').classList.remove('hidden');
   $('#a-name').focus();
 }
+
+$('#a-kind').onchange = () => applyKind($('#a-kind').value, false);
 
 $('#btn-new').onclick = () => openForm(null);
 $('#agent-close').onclick = () => $('#agent-modal').classList.add('hidden');
@@ -116,13 +159,32 @@ $('#agent-modal').onclick = (e) => {
 };
 
 $('#form-save').onclick = async () => {
+  const kind = $('#a-kind').value === 'external' ? 'external' : 'builtin';
   const payload = {
     name: $('#a-name').value.trim(),
     region: $('#a-region').value.trim(),
     description: $('#a-desc').value.trim(),
-    prompt: $('#a-prompt').value.trim(),
   };
   const err = $('#form-error');
+
+  if (kind === 'external') {
+    payload.endpoint = $('#a-endpoint').value.trim();
+    // ⚠️ auth 三种情况，语义必须分清：
+    //   填了新值        → 覆盖
+    //   留空            → 不改（后端不回传明文，所以空值不能当「清空」）
+    //   勾了「清除」     → 显式传空字符串
+    const authInput = $('#a-auth').value.trim();
+    if ($('#a-auth-clear').checked) {
+      payload.auth = '';
+    } else if (authInput) {
+      payload.auth = authInput;
+    }
+    if (!payload.endpoint) { err.textContent = '外部智能体必须填写调用地址'; return; }
+  } else {
+    payload.prompt = $('#a-prompt').value.trim();
+    if (!payload.prompt) { err.textContent = '人设与话术不能为空'; return; }
+  }
+
   if (!payload.name) { err.textContent = '名称不能为空'; return; }
 
   const btn = $('#form-save');
@@ -132,7 +194,8 @@ $('#form-save').onclick = async () => {
       await api(`/api/agents/${editing.id}`,
                 { method: 'POST', body: JSON.stringify(payload) });
     } else {
-      await api('/api/agents', { method: 'POST', body: JSON.stringify(payload) });
+      await api('/api/agents',
+                { method: 'POST', body: JSON.stringify({ ...payload, kind }) });
     }
     $('#agent-modal').classList.add('hidden');
     loadList();

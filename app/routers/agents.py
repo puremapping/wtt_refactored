@@ -68,8 +68,10 @@ async def api_update_agent(agent_id: str, request: Request,
     if err:
         return err
     body = await request.json()
-    ok = agent_svc.update_agent(agent_id, team_id, **{
-        k: body[k] for k in ("name", "region", "description", "prompt") if k in body})
+    fields = {k: body[k] for k in
+              ("name", "region", "description", "prompt", "endpoint", "auth")
+              if k in body}
+    ok = agent_svc.update_agent(agent_id, team_id, **fields)
     return {"ok": ok}
 
 

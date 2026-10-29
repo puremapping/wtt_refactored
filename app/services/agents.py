@@ -24,7 +24,7 @@ def list_agents(team_id: str) -> list:
         rows = conn.execute(
             "SELECT * FROM agents WHERE team_id=? AND deleted_at IS NULL "
             "ORDER BY created_at DESC", (team_id,)).fetchall()
-    return [dict(r) for r in rows]
+    return [_public(dict(r)) for r in rows]
 
 
 def get_agent(agent_id: str, team_id: str) -> Optional[dict]:
@@ -33,7 +33,24 @@ def get_agent(agent_id: str, team_id: str) -> Optional[dict]:
         r = conn.execute(
             "SELECT * FROM agents WHERE id=? AND team_id=? AND deleted_at IS NULL",
             (agent_id, team_id)).fetchone()
-    return dict(r) if r else None
+    return _public(dict(r)) if r else None
+
+
+def _public(row: dict) -> dict:
+    """对外形态：鉴权头脱敏
+
+    `auth` 里是 `Bearer sk-xxx` 这种凭证明文。前端只需要知道「填没填」，
+    不需要看到内容 —— 列表页一多，凭证明文就散落在每个渲染分支里了。
+    原值仍在库里，转发时由 ExternalAgent 直接读库行，不走这个函数。
+    """
+    out = dict(row)
+    if out.get("auth"):
+        out["auth"] = ""                     # 不回传明文
+        out["has_auth"] = True
+    else:
+        out["auth"] = ""
+        out["has_auth"] = False
+    return out
 
 
 def create_agent(team_id: str, creator_id: str, name: str,
@@ -67,11 +84,26 @@ def create_agent(team_id: str, creator_id: str, name: str,
 
 
 def update_agent(agent_id: str, team_id: str, **fields) -> bool:
-    """更新，只允许改这几个字段"""
-    allowed = ("name", "region", "description", "prompt")
+    """更新，只允许改这几个字段
+
+    ⚠️ kind 一旦定了不让改：builtin 和 external 的准入条件不同，
+       中途换轨会导致原本合法的记录变成不合法的（比如 external 换回 builtin
+       但没填 prompt）。要换轨就删了重建。
+
+    ⚠️ auth 的三态语义（前端依此设计，别改）：
+       - 字段**不出现**        → 保持原值（前端留空时的默认行为）
+       - 字段出现且非空        → 覆盖
+       - 字段出现且为空字符串   → 清空（前端「清除鉴权」勾选框）
+    """
+    allowed = ("name", "region", "description", "prompt", "endpoint", "auth")
     sets = {k: v for k, v in fields.items() if k in allowed}
     if not sets:
         return False
+
+    # auth 空串 → 存 NULL（库里 empty 和 NULL 都表示「没有」，统一成 NULL）
+    if sets.get("auth") == "":
+        sets["auth"] = None
+
     args = list(sets.values()) + [_now(), agent_id, team_id]
     with connect() as conn:
         cur = conn.execute(

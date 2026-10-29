@@ -45,6 +45,17 @@
     <h3 id="form-title">新建智能体</h3>
 
     <label class="fld">
+      <span>类型 <em>必填</em></span>
+      <select id="a-kind">
+        <option value="builtin">平台内自建 —— 填人设，用本平台的模型回答</option>
+        <option value="external">外部智能体 —— 填调用地址，转发到 Dify / Coze</option>
+      </select>
+      <span class="hint" id="kind-hint">
+        平台内自建：零额外部署，填一段人设就能回答
+      </span>
+    </label>
+
+    <label class="fld">
       <span>名称</span>
       <input id="a-name" type="text" placeholder="如：成都文旅助手">
     </label>
@@ -60,12 +71,40 @@
       <input id="a-desc" type="text" placeholder="如：带你逛遍成都的慢生活">
     </label>
 
-    <label class="fld">
-      <span>人设与话术 <em>必填</em></span>
-      <textarea id="a-prompt" rows="6"
-        placeholder="你是一个成都本地向导。用户想放松时，优先推荐巷子里的茶馆和郊野公园，避开人多的网红点…"></textarea>
-      <span class="hint">描述这个智能体该怎么说话、优先推什么</span>
-    </label>
+    <!-- builtin 轨专属 -->
+    <div id="fld-builtin">
+      <label class="fld">
+        <span>人设与话术 <em>必填</em></span>
+        <textarea id="a-prompt" rows="6"
+          placeholder="你是一个成都本地向导。用户想放松时，优先推荐巷子里的茶馆和郊野公园，避开人多的网红点…"></textarea>
+        <span class="hint">描述这个智能体该怎么说话、优先推什么</span>
+      </label>
+    </div>
+
+    <!-- external 轨专属 -->
+    <div id="fld-external" class="hidden">
+      <label class="fld">
+        <span>调用地址 <em>必填</em></span>
+        <input id="a-endpoint" type="url" placeholder="https://your-agent.example.com/chat">
+        <span class="hint">
+          平台会 POST 一段 JSON 到这个地址，字段为
+          <code>question / region / context</code>；<br>
+          你返回 <code>{"answer": "..."}</code> 或纯文本都行。
+        </span>
+      </label>
+
+      <label class="fld">
+        <span>鉴权方式</span>
+        <input id="a-auth" type="password" placeholder="Bearer sk-xxxxx">
+        <span class="hint" id="auth-hint">
+          原样放进 Authorization 头。留空则不发送该头。保存后不再回显。
+        </span>
+        <label id="auth-clear-row" class="hidden" style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:#666;">
+          <input id="a-auth-clear" type="checkbox" style="width:auto;margin:0;">
+          <span>清除已保存的鉴权</span>
+        </label>
+      </label>
+    </div>
 
     <div id="form-error" class="login-error"></div>
     <button id="form-save" class="primary full">保存</button>
