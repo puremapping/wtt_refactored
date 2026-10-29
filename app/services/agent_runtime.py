@@ -110,10 +110,22 @@ class BuiltinAgent(RegionAgent):
         if not self.prompt:
             return Answer("", degraded=True, reason="缺少人设/话术")
 
+        # 查本地景点事实（平台手上有官方名录，不该让模型自由发挥）
+        facts_text = self._facts_block(q)
+
         system = (
             f"你是{self.team_name or '地方文旅部门'}的智能体「{self.name}」，"
             f"负责回答关于{self.region or '本地'}的问题。\n"
             f"{self.prompt}\n\n"
+        )
+        if facts_text:
+            system += (
+                f"{facts_text}\n\n"
+                "⚠️ 硬性要求：提到具体景区时**只能用上面清单里的名字**。\n"
+                "清单里没有的地方，即使你知道也不要说 —— 说明你没查到即可。\n"
+                "不要编造门票价格、开放时间、预约规则这类清单里没有的信息。\n\n"
+            )
+        system += (
             "要求：\n"
             "- 只谈你负责的地区，超出范围就直说不知道，不要编\n"
             "- 回答简洁，2-4 句，不要罗列长清单\n"
@@ -130,6 +142,20 @@ class BuiltinAgent(RegionAgent):
         if not text:
             return Answer("", degraded=True, reason="模型返回空")
         return Answer(text)
+
+    def _facts_block(self, question: str) -> str:
+        """取本地区景点清单，格式化成 prompt 片段
+
+        ⚠️ 查库失败不该让整个回答失败 —— 没有事实块时智能体退化成
+           「自由发挥」模式，跟以前一样能答，只是不受名录约束。
+           摆烂和崩溃要分开：这里选摆烂。
+        """
+        try:
+            from app.services.agent_facts import fetch_facts, format_facts
+            facts = fetch_facts(self.region, question)
+            return format_facts(facts)
+        except Exception:
+            return ""
 
 
 # ──────────────────────────────────────────────────────────────
