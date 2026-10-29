@@ -177,8 +177,9 @@ def chat(session_id: Optional[str], user_text: str,
     #     不该被本地引擎的「我只有北京数据」话术覆盖掉
     delegated = _try_delegate(conv, user_text, reply, tool_calls,
                               blocked, region_agent)
+    reply_source = None
     if delegated is not None:
-        reply, tool_calls = delegated
+        reply, tool_calls, reply_source = delegated
 
     # 反向补齐：用户明确要求生成，但模型没调工具 → 强制补上
     # 实测教训：加了 destination 字段后，模型会优先追问「去哪个城市」
@@ -208,6 +209,9 @@ def chat(session_id: Optional[str], user_text: str,
         reply = _fallback_reply(tool_calls, conv)
 
     conv.messages.append({"role": "assistant", "content": reply})
+    # 来源跟着消息走，历史会话载入时才能还原「谁答的」
+    if reply_source:
+        conv.messages[-1]["source"] = reply_source
     conv.tool_calls = tool_calls          # 供上层执行
     save_session(conv, user_id)
     return conv
@@ -264,5 +268,18 @@ def _try_delegate(conv: Conversation, user_text: str, reply: str,
 
     # 接管：回复换成智能体的，工具调用清空（智能体没有行程能力）
     # 画像仍然保留 —— 用户说的话一样进了画像，下一轮本地引擎照常能用
-    conv.profile["_delegated_to"] = getattr(region_agent, "name", "") or ""
-    return (res.text.strip(), [])
+    #
+    # ⚠️ 存结构而不是光存名字：界面上要让用户看出来「现在谁在答、是哪个机构的」。
+    #    只存名字的话，同名智能体（多个文旅局都叫「文旅助手」）就分不清了。
+    conv.profile["_delegated_to"] = {
+        "name": getattr(region_agent, "name", "") or "",
+        "team": getattr(region_agent, "team_name", "") or "",
+        "region": getattr(region_agent, "region", "") or "",
+        "kind": getattr(region_agent, "kind", "") or "",
+    }
+
+    # ⚠️ 来源要跟着**消息**走，不能只挂在本轮结果上 ——
+    #    否则载入历史会话时每条回复都退化成无身份的气泡。
+    #    由调用方在 append assistant 消息时取用（见 chat() 末尾）。
+    pending_source = dict(conv.profile["_delegated_to"])
+    return (res.text.strip(), [], pending_source)

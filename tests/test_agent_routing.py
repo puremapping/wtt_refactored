@@ -118,10 +118,10 @@ def test_delegate_takes_over_when_all_conditions_met(seed_beijing):
 
     out = _try_delegate(conv, "北京有什么好吃的", "本地回复", [], False, agent)
     assert out is not None
-    reply, tool_calls = out
+    reply, tool_calls, source = out
     assert reply == "北京烤鸭必吃。"
     assert tool_calls == []
-    assert conv.profile["_delegated_to"] == "北京小助手"
+    assert conv.profile["_delegated_to"]["name"] == "北京小助手"
 
 
 def test_delegate_skipped_without_agent(seed_beijing):
@@ -294,7 +294,7 @@ def test_api_chat_delegates_to_region_agent(client, monkeypatch):
     assert r.status_code == 200
     body = r.json()
     assert body["reply"] == "故宫要提前预约。"
-    assert body["delegated_to"] == "北京小助手"
+    assert body["delegated_to"]["name"] == "北京小助手"
     assert holder["ai"] == 1
 
 
@@ -304,7 +304,8 @@ def test_api_chat_keeps_local_reply_without_agent(client):
     assert r.status_code == 200
     body = r.json()
     assert body["reply"] == "本地引擎的回复"
-    assert "delegated_to" not in body
+    # ⚠️ 本地引擎也要有身份标识 —— 前端靠它区分「平台推荐」和「官方口径」
+    assert body["delegated_to"]["kind"] == "local"
 
 
 def test_api_chat_keeps_local_reply_when_agent_errors(client, monkeypatch):
@@ -320,7 +321,8 @@ def test_api_chat_keeps_local_reply_when_agent_errors(client, monkeypatch):
     assert r.status_code == 200
     body = r.json()
     assert body["reply"] == "本地引擎的回复"
-    assert "delegated_to" not in body
+    # ⚠️ 本地引擎也要有身份标识 —— 前端靠它区分「平台推荐」和「官方口径」
+    assert body["delegated_to"]["kind"] == "local"
 
 
 def test_api_chat_skips_agent_for_itinerary_request(client, monkeypatch):
@@ -364,7 +366,7 @@ def test_delegated_to_hidden_from_profile(client, monkeypatch):
 
     r = client.post("/api/chat", json={"text": "北京有什么好玩的"})
     body = r.json()
-    assert body["delegated_to"] == "北京小助手"
+    assert body["delegated_to"]["name"] == "北京小助手"
     assert "_delegated_to" not in body["profile"]
 
 
@@ -381,13 +383,13 @@ def test_delegated_to_cleared_on_next_turn(client, monkeypatch):
                         lambda region, **kw: FakeAgent(region=region, text="智能体回答"))
 
     r1 = client.post("/api/chat", json={"text": "北京有什么好玩的"})
-    assert r1.json()["delegated_to"] == "北京小助手"
+    assert r1.json()["delegated_to"]["name"] == "北京小助手"
     sid = r1.json()["session_id"]
 
     # 第二轮：没提城市 → 本地引擎，不该残留标记
     r2 = client.post("/api/chat", json={"text": "有什么推荐的", "session_id": sid})
     body2 = r2.json()
-    assert "delegated_to" not in body2, "上一轮的接管标记泄漏到了这一轮"
+    assert body2["delegated_to"]["kind"] == "local", "上一轮的接管标记泄漏到了这一轮"
     assert body2["reply"] == "本地引擎的回复"
 
 
@@ -400,8 +402,8 @@ def test_delegated_to_cleared_when_switching_to_itinerary(client, monkeypatch):
 
     r1 = client.post("/api/chat", json={"text": "北京有什么好玩的"})
     sid = r1.json()["session_id"]
-    assert r1.json()["delegated_to"] == "北京小助手"
+    assert r1.json()["delegated_to"]["name"] == "北京小助手"
 
     r2 = client.post("/api/chat",
                      json={"text": "北京帮我排一天的行程", "session_id": sid})
-    assert "delegated_to" not in r2.json()
+    assert r2.json()["delegated_to"]["kind"] == "local"

@@ -55,13 +55,49 @@ function scrollToBottom() {
 
 // ────────── 消息渲染 ──────────
 
-function addMessage(role, text) {
+/**
+ * @param role    'user' | 'assistant'
+ * @param text    正文
+ * @param source  谁在答：{name, team, region, kind}
+ *                kind='local' 是平台自己的引擎，其余是文旅局智能体
+ *
+ * ⚠️ 用户必须有身份标识：同一句问话，走本地引擎和走「成都文旅局」的
+ *    智能体，答案的性质完全不同（前者是平台推荐，后者是官方口径）。
+ *    不分清，用户没法判断该不该信。
+ */
+function addMessage(role, text, source) {
   const div = document.createElement('div');
   div.className = `msg ${role}`;
+
+  const stack = document.createElement('div');
+  stack.className = 'msg-stack';
+
+  if (role !== 'user' && source && source.name) {
+    const tag = document.createElement('div');
+    tag.className = `msg-src src-${source.kind || 'local'}`;
+
+    const nm = document.createElement('span');
+    nm.className = 'src-name';
+    nm.textContent = source.name;
+    tag.appendChild(nm);
+
+    // 机构名和智能体名重复时不再重复显示
+    if (source.team && source.team !== source.name) {
+      const tm = document.createElement('span');
+      tm.className = 'src-team';
+      tm.textContent = source.team;
+      tag.appendChild(tm);
+    }
+
+    stack.appendChild(tag);
+  }
+
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.textContent = text;
-  div.appendChild(bubble);
+  stack.appendChild(bubble);
+
+  div.appendChild(stack);
   $('#messages').appendChild(div);
   scrollToBottom();
   return div;
@@ -156,7 +192,7 @@ async function send(text) {
 
     sessionId = d.session_id;
     removeTyping();
-    addMessage('assistant', d.reply);
+    addMessage('assistant', d.reply, d.delegated_to);
     renderProfile(d.profile || {});
 
     // 匿名用户第一次生成行程后，提示登录
@@ -384,7 +420,8 @@ function restart() {
 
 function greet() {
   addMessage('assistant',
-    '你好，我是 Where to Travel 的旅行助手。\n\n先别急着说去哪——我更想知道，你这次是**为什么**想出去走走？');
+    '你好，我是 Where to Travel 的旅行助手。\n\n先别急着说去哪——我更想知道，你这次是**为什么**想出去走走？',
+    { name: '平台助手', team: 'Where to Travel', region: '', kind: 'local' });
 }
 
 // ────────── 用户系统 ──────────
@@ -488,7 +525,7 @@ async function loadHistory(sid) {
     $('#messages').innerHTML = '';
     sessionId = d.session_id;
     (d.messages || []).forEach((m) => {
-      addMessage(m.role === 'user' ? 'user' : 'assistant', m.content);
+      addMessage(m.role === 'user' ? 'user' : 'assistant', m.content, m.source);
     });
     if (d.itinerary) {
       lastItinerary = d.itinerary;

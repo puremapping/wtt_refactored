@@ -89,10 +89,18 @@ async def chat(request: Request, user=Depends(current_user_optional)):
         "logged_in": bool(uid),
     }
 
-    # 本轮是否由文旅局智能体回答（前端可据此显示来源）
+    # 本轮是否由文旅局智能体回答（前端据此显示「谁在答」）
     delegated_to = conv.profile.get("_delegated_to")
     if delegated_to:
         result["delegated_to"] = delegated_to
+    else:
+        # 显式给本地引擎一个身份，前端才能一致地显示来源
+        result["delegated_to"] = {
+            "name": "平台助手",
+            "team": "Where to Travel",
+            "region": "",
+            "kind": "local",
+        }
 
     # 处理工具调用
     for tc in conv.tool_calls:

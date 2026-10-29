@@ -72,8 +72,41 @@ body {
 .msg.user { justify-content: flex-end; }
 .msg.assistant { justify-content: flex-start; }
 
-.bubble {
+/* 消息列：身份标签在上，气泡在下 */
+.msg-stack {
+  display: flex;
+  flex-direction: column;
   max-width: 78%;
+}
+.msg.user .msg-stack { align-items: flex-end; }
+
+/* ⚠️ 有些气泡是 JS 直接拼在 .msg 下面的（打字指示、登录提示、修改提案），
+   没走 .msg-stack。这里让它们仍然占满可用宽度，别被新加的 flex 列规则挤窄。 */
+.msg > .bubble {
+  max-width: 78%;
+}
+
+/* 来源标签：让用户知道这句话是谁说的 */
+.msg-src {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1;
+  margin: 0 0 5px 3px;
+}
+.msg-src .src-name { font-weight: 600; }
+.msg-src .src-team { opacity: .65; }
+
+/* 文旅局智能体：用强调色，表示这是「官方口径」 */
+.msg-src.src-builtin .src-name { color: #2f7a45; }
+.msg-src.src-external .src-name { color: #a8632b; }
+
+/* 平台自己的引擎：灰一点，不高亮 */
+.msg-src.src-local .src-name { color: var(--muted, #999); }
+
+.bubble {
+  max-width: 100%;
   padding: 11px 15px;
   border-radius: 14px;
   white-space: pre-wrap;

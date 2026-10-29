@@ -123,7 +123,7 @@ def test_itinerary_not_delegated_to_agent(seed_beijing, monkeypatch):
     body = r.json()
 
     assert called["n"] == 0, "排行程时智能体被调用了"
-    assert "delegated_to" not in body
+    assert body["delegated_to"]["kind"] == "local"
     assert body.get("itinerary"), "行程没生成"
 
 
