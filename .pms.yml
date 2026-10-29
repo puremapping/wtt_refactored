@@ -1,33 +1,43 @@
 # .pms.yml — 项目元信息
 name: where_to_travel
-version: 0.7.0
+version: 0.8.0
 status: doing
+canonical_repo: true        # ★ 本项目为主干，旧库 where_to_travel 已冻结
 tags: [education/course, travel, llm, recommendation, fastapi, beijing-opendata, amap, function-calling, auth, analytics]
 created: 2026-09-17
-last_used: 2026-10-21
+last_used: 2026-10-26
 sp_project: null
 temporary_owner: null
 archive_path: null
 context:
   goal: "课程作业 → 目标是能落地。以 AI 对话为核心入口的旅游决策平台，先挖 Travel for What（动机），再推荐去哪，给出可解释推荐与一日行程预演。北京真实数据。"
   next: |
-    按 DESIGN-user-system.md §6 未做项推进，优先级：
-    1. 直线距离 → 接高德路径规划 API（有配额，能让时间线更准）
-    2. 数据覆盖：只有北京 212 个景区（可落地的主要瓶颈）
-    3. 密码重置（需邮件服务）
-    4. session_end 事件无触发点（等明确「结束」信号）
+    ★ 2026-10-26 交接完成，本仓库为主干。详见 HANDOVER.md。
 
-    【调研完成，未立项】Coze Studio 作为文旅平台底座（2026-10-20 实测）：
-    · 结论：可作底座。发布不受限（connector 1024=OpenAPI），平台调 /v3/chat 即可，
-      **不是我方做成它的插件，而是我方为主、它为引擎**
-    · 多租户：表结构支持但产品层锁死，已二开（~120 行 Go + 1 条 ALTER TABLE），
-      验证可建多个团队空间
-    · 缺的：前端团队空间 UI（开源版无）、API Key 管理接口、审核角色、
-      准入质检、bot_id 路由表——全是你要自己补的
-    · 成本：12 容器 / 13GB 镜像 / ES+Milvus 吃内存（官方「2核4G」偏乐观）
-    · 详见 docs/research/coze-studio-hands-on.md（部署实录+5个坑+接口清单）
-      与 coze-studio-multitenant.patch（二开补丁）
+    【P1｜最高优先】文旅局智能体未接通（半成品）
+      实测：chat 主流程对 route_agent_by_region 零引用；14 个智能体
+      external_id 全空；6 个已发布但无人调用。三个断点：
+        ① 主流程路由：chat() 里没分流，用户说「成都」不会去找成都的智能体
+        ② 智能体无执行体：只有 prompt 字段，需接 GLM 或 Coze
+        ③ 无准入质检
+      先做 ①+②（用 prompt 调 GLM，约半天），能演示但内容靠模型编；
+      做 ② 的 Coze 版需背 12 容器部署重量，暂不推荐。
+
+    【P2】图片上传接口（现在帖子卡片是占位图）
+    【P3】README 入口地址过时（/ 已改浏览页，/chat 才是对话页）
+    【P4】旅游回忆的 AI 总结只有接口，未接 LLM 生成
+
+    历史待办（优先级低于上面）：
+    1. 直线距离 → 接高德路径规划 API
+    2. 数据覆盖：只有北京 212 个景区（主要瓶颈）
+    3. 密码重置（需邮件服务）
+    4. 同名区歧义：北京/成都都有「朝阳区」，无上下文按景区数多者解析
+
   decided: |
+    - 【2026-10-26 交接】小霁（v0.5→v0.7）把项目管理权交给本仓库：
+      · 本仓库为主干（canonical_repo: true），旧 where_to_travel 冻结作回退基准
+      · v0.5-v0.7 成果已全在重构基线内，旧库无独家内容
+      · 交接文档 HANDOVER.md；智能体断点已实测记录（P1）
     - 【目标】阿哲定为「想尽可能落地试试」，是他第一个与商业化有关的项目
     - 【架构】FastAPI + SQLite + Jinja2 + Leaflet，不做前后端分离（无构建链）
     - 【v0.7】三页式产品 + 身份系统（本次）：
