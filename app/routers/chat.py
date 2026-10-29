@@ -8,9 +8,11 @@ from fastapi.responses import JSONResponse
 
 from app.core.ratelimit import SlidingWindowLimiter
 from app.routers.deps import current_user_optional
+from app.services import agents as agent_svc
 from app.services import analytics as ana
 from app.services import conversation as convo_svc
 from app.services import itinerary_flow as flow
+from app.services.conversation.routing import should_delegate
 
 router = APIRouter(tags=["chat"])
 
@@ -51,9 +53,20 @@ async def chat(request: Request, user=Depends(current_user_optional)):
     # chat 内部会从对应存储（DB / 内存）载入 conv，但也需要单独传给 LLM
     current_itinerary = flow.load_itinerary(sid, uid) if sid else None
 
+    # 找本轮的文旅局智能体（P1 第 2 步）
+    # ⚠️ 这里只做「按地区查」+ 容错。要不要交给它由编排层的 _try_delegate 决定。
+    # 任何异常都吞掉 —— 智能体是增强功能，挂了不能影响基础对话。
+    region_agent = None
+    region = should_delegate(text)
+    if region:
+        try:
+            region_agent = agent_svc.find_region_agent(region)
+        except Exception:
+            region_agent = None
+
     try:
         conv = convo_svc.chat(sid, text, current_itinerary=current_itinerary,
-                              user_id=uid)
+                              user_id=uid, region_agent=region_agent)
     except Exception as e:
         return JSONResponse({"error": f"对话失败: {e}"}, status_code=500)
 
@@ -75,6 +88,11 @@ async def chat(request: Request, user=Depends(current_user_optional)):
         "tool_calls": conv.tool_calls,
         "logged_in": bool(uid),
     }
+
+    # 本轮是否由文旅局智能体回答（前端可据此显示来源）
+    delegated_to = conv.profile.get("_delegated_to")
+    if delegated_to:
+        result["delegated_to"] = delegated_to
 
     # 处理工具调用
     for tc in conv.tool_calls:

@@ -132,6 +132,20 @@ def delete_agent(agent_id: str, team_id: str) -> bool:
         return cur.rowcount > 0
 
 
+def published_regions() -> list:
+    """所有已发布智能体覆盖的地区（去重，去空）
+
+    给路由层用：城市注册表里没有、但文旅局注册了智能体的地区，
+    也要能被用户的提问命中。
+    """
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT region FROM agents "
+            "WHERE status='published' AND deleted_at IS NULL "
+            "AND region IS NOT NULL AND TRIM(region) != ''").fetchall()
+    return [r["region"].strip() for r in rows if r["region"]]
+
+
 def route_agent_by_region(region: str) -> Optional[dict]:
     """主智能体用：按地区找已发布的智能体（返回数据库原始行）
 

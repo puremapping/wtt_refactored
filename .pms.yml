@@ -15,10 +15,24 @@ context:
     ★ 2026-10-26 交接完成，本仓库为主干。详见 HANDOVER.md。
     ★ 2026-10-26 阿哲定：库名沿用 wtt_refactored，不改。
 
-    【P1｜最高优先】智能体路由打通（阿哲定：先做这个）
-      现状实测：chat 主流程对 route_agent_by_region 零引用；
-                14 个智能体 external_id 全空；6 个已发布但无人调用。
-      要做：用户说「成都」→ 查已发布智能体 → 有则调它，无则走本地逻辑。
+    【P1｜✅ 已完成 2026-10-29】智能体路由打通
+      · P1-1 统一抽象：app/services/agent_runtime.py
+        RegionAgent 契约（region + answer()），BuiltinAgent 调 GLM，
+        ExternalAgent 转发 HTTP，build_agent 按 kind 分派。
+        agents 表加 kind/endpoint/auth 三列。
+      · P1-2 主流程路由：app/services/conversation/routing.py + orchestrator._try_delegate
+        用户提到地区 → 有已发布智能体 → 交给它；本地引擎要排行程时不接管。
+        find_region_agent() 返回可直接 answer() 的对象。
+      · 实测：北京问答交给「北京文旅bot」；排行程/未提城市/无智能体城市均走本地引擎。
+      · 测试 192 passed（含新增 75 项，零真实 LLM、零真实外网）。
+
+    【P1 遗留｜下一步】
+      · 外部轨（轨道 B）还没有 /console 的填写界面 —— 后端已通（API 收 kind/endpoint/auth），
+        前端表单还没加字段。
+      · 数据缺口：城市注册表只有北京，但已有成都智能体。路由层已兜住
+        （解析不出就退到智能体表匹配），但成都智能体答不了景点 —— 它没有景点数据。
+      · 「帮我排一天的行程」时模型不调 generate_itinerary，只给文字描述，
+        右侧行程卡片不生成。属原有反向补齐逻辑的边界情况，与路由无关。
 
     【P2】双轨智能体架构（阿哲 2026-10-26 提出，替代「全用 Coze」方案）
       · 轨道 A｜简易版自建：文旅局在我们平台填 prompt + 数据，直接用 GLM 跑。

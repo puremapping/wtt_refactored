@@ -46,8 +46,14 @@ from app.services.tools import get_tools
 def chat(session_id: Optional[str], user_text: str,
          llm: Optional[LLM] = None,
          current_itinerary: dict = None,
-         user_id: str = None) -> Conversation:
-    """处理一轮对话：用户说话 → AI 回复 + 更新画像 + 可能的工具调用"""
+         user_id: str = None,
+         region_agent: Optional[object] = None) -> Conversation:
+    """处理一轮对话：用户说话 → AI 回复 + 更新画像 + 可能的工具调用
+
+    `region_agent`：本轮的文旅局智能体（已由调用方按地区找好）。
+      传了才会尝试接管 —— 编排层不查库，查库是 routers/chat.py 的事。
+      接管判定见 `_try_delegate()`：本地引擎有事要干时不接管。
+    """
     llm = llm or LLM()
 
     # 1. 取或建会话
@@ -136,7 +142,6 @@ def chat(session_id: Optional[str], user_text: str,
     has_itin = bool(current_itinerary)
     _raw_count = len(tool_calls)
     tool_calls = _sanitize_tool_calls(tool_calls, user_text, has_itin)
-
     # ⚠️ 关键补救：模型本打算调工具（所以没写正文），但服务端把工具拦掉了
     #    → 此刻 reply 和 tool_calls 双空，用户会收到空洞兜底。
     #    正确做法：**重新让模型用文字回答**（去掉 tools 再问一次），
@@ -158,6 +163,22 @@ def chat(session_id: Optional[str], user_text: str,
     # ⚠️ 画像已在第 4 步合并，conv.profile 里就是本轮最新目的地（含占位词清洗）。
     dest = _clean_field_value(conv.profile.get("destination"))
     blocked = bool(dest) and not _is_supported_destination(dest)
+
+    # ── 文旅局智能体接管（P1 第 2 步）────────────────────────────
+    # ⚠️ 先清掉上一轮的接管标记 —— 它是每轮结论，不是会话状态。
+    #    不清的话，用户第二轮没提城市时前端还会显示「由北京文旅局回答」，
+    #    那是纯泄漏（2026-10-29 实测抓到）。
+    conv.profile.pop("_delegated_to", None)
+    #
+    # 时机在这里是有讲究的：
+    #   - 放在 tool_calls 校验之后：本地引擎这轮要排行程时不接管（tool_calls 非空）
+    #   - 放在「反向补齐」之前：补齐逻辑只看用户有没有生成意图，与接管无关
+    #   - 放在数据边界拦截之前：智能体自己负责说清它的覆盖范围，
+    #     不该被本地引擎的「我只有北京数据」话术覆盖掉
+    delegated = _try_delegate(conv, user_text, reply, tool_calls,
+                              blocked, region_agent)
+    if delegated is not None:
+        reply, tool_calls = delegated
 
     # 反向补齐：用户明确要求生成，但模型没调工具 → 强制补上
     # 实测教训：加了 destination 字段后，模型会优先追问「去哪个城市」
@@ -190,3 +211,58 @@ def chat(session_id: Optional[str], user_text: str,
     conv.tool_calls = tool_calls          # 供上层执行
     save_session(conv, user_id)
     return conv
+
+
+# ──────────────────────────────────────────────────────────────
+# 文旅局智能体接管
+# ──────────────────────────────────────────────────────────────
+
+
+def _try_delegate(conv: Conversation, user_text: str, reply: str,
+                  tool_calls: list, blocked: bool,
+                  region_agent) -> Optional[tuple]:
+    """让地区智能体接管这轮回复
+
+    返回 (reply, tool_calls)；不该接管返回 None（调用方保持原样）。
+
+    接管的四个前提（全满足才接）：
+      1. 有智能体 —— 调用方按地区查好传进来的
+      2. 本地引擎这轮没活干 —— tool_calls 空（要排行程就别抢）
+      3. 目的地没被本地数据边界拦下 —— 拦下了说明用户问的是平台管不到的城市，
+         此时智能体（若有）反而更该回答，所以这条不拦，只记录
+      4. 智能体自己答得出来 —— answer() 没降级
+
+    ⚠️ 智能体答不出来（超时/报错/空回）时**不接管**，保留本地引擎的原回复。
+       宁可回答得平庸，也不能给用户一句空洞的兜底 —— 那是本产品反复踩过的坑。
+    """
+    if region_agent is None:
+        return None
+    if tool_calls:
+        return None                      # 本地引擎要排行程/改行程，别抢
+
+    from app.services.conversation.routing import mentioned_region, wants_local_engine
+
+    # 双保险：路由判定在这里再跑一次。
+    # 调用方已经判过，但编排层是最后一道闸 —— 用户原话若不含城市（比如
+    # 「有什么好吃的」），智能体没有立足点，不接。
+    if wants_local_engine(user_text):
+        return None
+    region = mentioned_region(user_text)
+    if not region or region != getattr(region_agent, "region", None):
+        return None
+
+    try:
+        res = region_agent.answer(
+            user_text,
+            context={"profile": conv.profile, "turn": conv.turn},
+        )
+    except Exception:
+        return None                      # 智能体炸了，兜回本地回复
+
+    if getattr(res, "degraded", False) or not getattr(res, "text", ""):
+        return None                      # 答不出来就别硬塞
+
+    # 接管：回复换成智能体的，工具调用清空（智能体没有行程能力）
+    # 画像仍然保留 —— 用户说的话一样进了画像，下一轮本地引擎照常能用
+    conv.profile["_delegated_to"] = getattr(region_agent, "name", "") or ""
+    return (res.text.strip(), [])
