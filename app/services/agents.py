@@ -38,18 +38,31 @@ def get_agent(agent_id: str, team_id: str) -> Optional[dict]:
 
 def create_agent(team_id: str, creator_id: str, name: str,
                  region: str = "", description: str = "",
-                 prompt: str = "") -> str:
+                 prompt: str = "", kind: str = "builtin",
+                 endpoint: str = "", auth: str = "") -> str:
+    """建智能体。
+
+    kind='builtin'  —— 平台内自建，靠 prompt 调 GLM（默认）
+    kind='external' —— 外部注册，靠 endpoint 转发（prompt 可空）
+    """
     if not (name or "").strip():
         raise ValueError("智能体名称不能为空")
+    if kind not in ("builtin", "external"):
+        raise ValueError(f"未知的智能体类型：{kind}")
+    if kind == "external" and not (endpoint or "").strip():
+        raise ValueError("外部智能体必须填写调用地址")
+
     aid = uuid.uuid4().hex[:16]
     now = _now()
     with connect() as conn:
         conn.execute(
             "INSERT INTO agents "
-            "(id,team_id,creator_id,name,region,description,prompt,status,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "(id,team_id,creator_id,name,region,description,prompt,status,"
+            " kind,endpoint,auth,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (aid, team_id, creator_id, name.strip(), region.strip() or None,
-             description.strip() or None, prompt.strip() or None, "draft", now, now))
+             description.strip() or None, prompt.strip() or None, "draft",
+             kind, endpoint.strip() or None, auth.strip() or None, now, now))
     return aid
 
 
@@ -69,24 +82,46 @@ def update_agent(agent_id: str, team_id: str, **fields) -> bool:
 
 
 def publish_agent(agent_id: str, team_id: str) -> dict:
-    """发布。⚠️ 发布前必须有 prompt 和 region —— 否则主智能体没法路由到它"""
+    """发布。⚠️ 发布前必须过准入检查 —— 否则主智能体没法路由到它，或者路由到了也答不出来
+
+    两条轨的准入条件不同：
+      builtin  —— 要 prompt（不然没话术）+ region（不然没法路由）
+      external —— 要 endpoint（不然调不动）+ region；prompt 可空（对方自己有人设）
+    共同要求：region 必填，这是路由的唯一依据。
+    """
     with connect() as conn:
         r = conn.execute(
             "SELECT * FROM agents WHERE id=? AND team_id=? AND deleted_at IS NULL",
             (agent_id, team_id)).fetchone()
         if not r:
             return {"ok": False, "error": "智能体不存在"}
-        problems = []
-        if not r["prompt"]:
-            problems.append("缺少人设/话术")
-        if not r["region"]:
-            problems.append("缺少覆盖地区（主智能体靠它路由）")
+        problems = _publish_problems(dict(r))
         if problems:
             return {"ok": False, "error": "、".join(problems)}
 
         conn.execute("UPDATE agents SET status='published',updated_at=? "
                      "WHERE id=? AND team_id=?", (_now(), agent_id, team_id))
     return {"ok": True}
+
+
+def _publish_problems(row: dict) -> list:
+    """准入检查（纯函数，不碰库 —— 测试可直接调用）"""
+    problems = []
+    kind = (row.get("kind") or "builtin").strip().lower()
+
+    if not (row.get("region") or "").strip():
+        problems.append("缺少覆盖地区（主智能体靠它路由）")
+
+    if kind == "external":
+        if not (row.get("endpoint") or "").strip():
+            problems.append("缺少调用地址")
+    elif kind == "builtin":
+        if not (row.get("prompt") or "").strip():
+            problems.append("缺少人设/话术")
+    else:
+        problems.append(f"未知的智能体类型：{kind}")
+
+    return problems
 
 
 def delete_agent(agent_id: str, team_id: str) -> bool:
@@ -98,9 +133,12 @@ def delete_agent(agent_id: str, team_id: str) -> bool:
 
 
 def route_agent_by_region(region: str) -> Optional[dict]:
-    """主智能体用：按地区找已发布的智能体
+    """主智能体用：按地区找已发布的智能体（返回数据库原始行）
 
     匹配：region 完全等于，或互相包含（「成都」能匹到「成都市」）
+
+    ⚠️ 这是**取数据**。要拿来回答问题的，用 `find_region_agent()` ——
+    它返回统一抽象 RegionAgent，两条轨对调用方同形。
     """
     if not region:
         return None
@@ -118,3 +156,20 @@ def route_agent_by_region(region: str) -> Optional[dict]:
         if rr == key or rr in key or key in rr:
             return dict(r)
     return None
+
+
+def find_region_agent(region: str, **kwargs):
+    """按地区找已发布智能体，返回**统一抽象**（app/services/agent_runtime.RegionAgent）
+
+    与 route_agent_by_region 的区别：
+      - 这个给主对话用，返回值可以直接 `.answer(question)`
+      - 数据脏（kind 不认识 / 缺地区）时返回 None，不会把坏对象交出去
+
+    kwargs（llm= / opener=）透传给底层实现，供测试注入。
+    """
+    from app.services.agent_runtime import build_agent
+
+    row = route_agent_by_region(region)
+    if not row:
+        return None
+    return build_agent(row, **kwargs)

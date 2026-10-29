@@ -112,7 +112,10 @@ CREATE TABLE IF NOT EXISTS agents (
     description TEXT,
     prompt      TEXT,                     -- 人设 / 话术
     status      TEXT NOT NULL DEFAULT 'draft',   -- draft | published
+    kind        TEXT NOT NULL DEFAULT 'builtin', -- builtin 平台内自建 | external 外部注册
     external_id TEXT,                     -- 对应 Coze bot_id（暂空）
+    endpoint    TEXT,                     -- external 轨的调用地址（POST 到它）
+    auth        TEXT,                     -- external 轨的鉴权头原值，如 `Bearer xxx`
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
     deleted_at  TEXT
@@ -237,6 +240,16 @@ def _migrate(conn):
     ):
         if name not in cols("sessions"):
             conn.execute(f"ALTER TABLE sessions ADD COLUMN {name} {decl}")
+
+    # agents 双轨架构（P1 第 1 步）：区分平台内自建 / 外部注册
+    # ⚠️ kind 必须带 DEFAULT —— 老库已有的 14 行全是平台内建的，默认即正确分类
+    for name, decl in (
+        ("kind", "TEXT NOT NULL DEFAULT 'builtin'"),
+        ("endpoint", "TEXT"),
+        ("auth", "TEXT"),
+    ):
+        if name not in cols("agents"):
+            conn.execute(f"ALTER TABLE agents ADD COLUMN {name} {decl}")
 
     _migrate_events_notnull(conn)
     _migrate_attractions_city(conn)

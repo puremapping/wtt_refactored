@@ -41,7 +41,10 @@ async def api_create_agent(request: Request, user=Depends(require_user)):
             name=body.get("name", ""),
             region=body.get("region", ""),
             description=body.get("description", ""),
-            prompt=body.get("prompt", ""))
+            prompt=body.get("prompt", ""),
+            kind=body.get("kind", "builtin"),
+            endpoint=body.get("endpoint", ""),
+            auth=body.get("auth", ""))
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     return {"id": aid, "ok": True}
