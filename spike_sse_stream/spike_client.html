@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>流式过程面板 spike</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --line:#262b36; --fg:#e6e8ee;
+    --dim:#8b93a7; --acc:#5b8def; --ok:#3fbf87; --warn:#e0a63c; --err:#e5605f;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.6 -apple-system,"Segoe UI","PingFang SC",sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; padding:24px 16px 120px; }
+  .msgs { display:flex; flex-direction:column; gap:14px; }
+  .msg { display:flex; }
+  .msg.user { justify-content:flex-end; }
+  .msg.user .bubble { background:var(--acc); color:#fff; border-radius:14px 14px 4px 14px; }
+  .bubble { max-width:82%; padding:10px 14px; border-radius:14px;
+            background:var(--panel); border:1px solid var(--line);
+            white-space:pre-wrap; word-break:break-word; }
+  .bubble .caret { display:inline-block; width:7px; height:1em; vertical-align:-2px;
+                   background:var(--acc); animation:blink .9s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+
+  /* ── 可折叠过程面板 ── */
+  .proc { max-width:82%; border:1px solid var(--line); border-radius:10px;
+          background:#13161d; overflow:hidden; }
+  .proc-head { display:flex; align-items:center; gap:8px; width:100%;
+               padding:7px 11px; background:none; border:0; cursor:pointer;
+               color:var(--dim); font:inherit; font-size:12.5px; text-align:left; }
+  .proc-head:hover { color:var(--fg); }
+  .proc-head .chev { transition:transform .15s; display:inline-block; }
+  .proc[data-open="1"] .chev { transform:rotate(90deg); }
+  .proc-body { display:none; padding:2px 11px 11px; border-top:1px solid var(--line); }
+  .proc[data-open="1"] .proc-body { display:block; }
+  .step { display:flex; gap:9px; padding:5px 0; font-size:12.5px; align-items:baseline; }
+  .step .ic { width:15px; flex:none; text-align:center; }
+  .step .ic.run { color:var(--warn); }
+  .step .ic.ok  { color:var(--ok); }
+  .step .ic.err { color:var(--err); }
+  .step .nm { color:var(--fg); flex:none; min-width:76px; }
+  .step .dt { color:var(--dim); }
+  .step.fold .dt { max-height:3.4em; overflow:hidden; position:relative; }
+  .free { color:var(--dim); }
+  pre.raw { margin:4px 0 0; padding:8px 10px; background:#0c0e12; border-radius:7px;
+            color:#a9b4cc; font-size:11.5px; max-height:220px; overflow:auto;
+            white-space:pre-wrap; word-break:break-all; font-family:ui-monospace,Consolas,monospace; }
+  .badge { display:inline-block; padding:1px 7px; border-radius:20px; font-size:11px;
+           border:1px solid var(--line); color:var(--dim); }
+  .badge.ok { color:var(--ok); border-color:#1f4a37; background:#0e231a; }
+  .badge.err { color:var(--err); border-color:#4a2220; background:#26100f; }
+  .errbox { border:1px solid #4a2220; background:#26100f; color:#ffb3b2;
+            border-radius:10px; padding:9px 12px; font-size:13px; }
+  .composer { position:fixed; left:0; right:0; bottom:0; padding:12px 16px;
+              background:linear-gradient(transparent, var(--bg) 30%); }
+  .composer .inner { max-width:720px; margin:0 auto; display:flex; gap:8px; }
+  textarea { flex:1; resize:none; padding:11px 13px; border-radius:10px;
+             border:1px solid var(--line); background:var(--panel); color:var(--fg);
+             font:inherit; }
+  button.go { padding:0 18px; border-radius:10px; border:0; background:var(--acc);
+              color:#fff; font:inherit; cursor:pointer; }
+  button.go:disabled { opacity:.5; cursor:default; }
+  .toolbar { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .toolbar button { padding:4px 10px; font-size:12px; border-radius:7px;
+                    border:1px solid var(--line); background:var(--panel);
+                    color:var(--dim); cursor:pointer; }
+  .toolbar button:hover { color:var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h3 style="margin:0 0 6px">流式过程面板 spike</h3>
+  <p style="color:#8b93a7;font-size:12.5px;margin:0 0 14px">
+    面板默认折叠，折叠时显示进度摘要；展开看每步耗时与工具。切场景按钮改的是后端假 LLM。
+  </p>
+  <div class="toolbar">
+    <button data-mode="chat:">正常对话</button>
+    <button data-mode="tool:">工具轮（正文为空）</button>
+    <button data-mode="chat:extract">抽取阶段失败</button>
+    <button data-mode="chat:midway">流到一半失败</button>
+  </div>
+  <div class="msgs" id="msgs"></div>
+</div>
+
+<div class="composer"><div class="inner">
+  <textarea id="input" rows="1" placeholder="想去北京散心（Enter 发送）"></textarea>
+  <button class="go" id="send">发送</button>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let sessionId = null;
+let busy = false;
+
+// ══════════════════════════════════════════════════════════════
+// 一、SSE over fetch —— 为什么不直接用 EventSource
+// ══════════════════════════════════════════════════════════════
+//
+// EventSource 的三个硬限制，本项目全踩：
+//   1. 只能 GET —— 我们要 POST 长文本，URL 放不下也不该放（会进访问日志）
+//   2. 不能带自定义 header —— 加了 CSRF token / Accept 就没法用
+//   3. 不能读 status / header，也没法手动 abort 得干净利落
+// 结论：fetch + ReadableStream 手写解析。协议简单（event:/data:/id: 三行），
+// 解析器 30 行，不引任何库。
+
+async function* sseLines(resp, signal) {
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      // ⚠️ 坑：网络 chunk 边界 ≠ 行边界。必须留残余，否则一条事件被劈两半。
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        let line = buf.slice(0, i);
+        buf = buf.slice(i + 1);
+        // ⚠️ 坑：UTF-8 多字节字符会被 chunk 劈开。decoder 的 {stream:true}
+        //    处理了字节层，但换行只可能落在 \n 上，所以这里安全。
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        yield line;
+      }
+    }
+    const rest = dec.decode();
+    if (rest) buf += rest;
+  } finally {
+    // ⚠️ 用户中途关页/取消：必须 cancel 读端，否则浏览器保持连接，
+    //    后端要等 TCP 超时才知道人不在了（LLM 继续在烧钱）。
+    try { reader.releaseLock(); } catch {}
+    if (signal && signal.aborted) { try { await reader.cancel(); } catch {} }
+  }
+}
+
+/** 把行流组装成 {event, data, id} 事件。注释行（: ping）直接吃掉。 */
+async function* sseEvents(resp, signal) {
+  let ev = { event: 'message', data: null, id: null };
+  for await (const line of sseLines(resp, signal)) {
+    if (line === '') {                       // 空行 = 事件结束
+      if (ev.data !== null) yield { ...ev, data: JSON.parse(ev.data) };
+      ev = { event: 'message', data: null, id: null };
+      continue;
+    }
+    if (line.startsWith(':')) continue;      // 心跳注释
+    const c = line.indexOf(':');
+    const field = c === -1 ? line : line.slice(0, c);
+    let val = c === -1 ? '' : line.slice(c + 1);
+    if (val.startsWith(' ')) val = val.slice(1);
+    if (field === 'event') ev.event = val;
+    else if (field === 'data') ev.data = (ev.data === null ? '' : ev.data + '\n') + val;
+    else if (field === 'id') ev.id = val;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 二、可折叠过程面板
+// ══════════════════════════════════════════════════════════════
+
+const STEP_LABEL = { extract: '理解想法', reply: '组织回复', tools: '调用工具' };
+
+function makePanel() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg assistant';
+
+  const proc = document.createElement('div');
+  proc.className = 'proc';
+  proc.dataset.open = '0';
+
+  const head = document.createElement('button');
+  head.className = 'proc-head';
+  head.type = 'button';
+  head.innerHTML = `<span class="chev">▸</span><span class="sum">正在处理…</span>`;
+  head.onclick = () => {
+    proc.dataset.open = proc.dataset.open === '1' ? '0' : '1';
+  };
+
+  const body = document.createElement('div');
+  body.className = 'proc-body';
+
+  proc.append(head, body);
+  wrap.appendChild(proc);
+
+  const steps = new Map();       // name → {row, ic, dt}
+  let replyEl = null;
+
+  let reasoningEl = null;
+
+  function row(name, text) {
+    const d = document.createElement('div');
+    d.className = 'step';
+    d.innerHTML = `<span class="ic">·</span><span class="nm">${name}</span>
+                   <span class="dt">${text}</span>`;
+    body.appendChild(d);
+    return d;
+  }
+
+  return {
+    el: wrap,
+    body,
+    get replyEl() { return replyEl; },
+
+    /** 文本气泡：直接挂在面板下方，独立于折叠态 */
+    ensureReply() {
+      if (!replyEl) {
+        replyEl = document.createElement('div');
+        replyEl.className = 'bubble';
+        this.el.appendChild(replyEl);
+      }
+      return replyEl;
+    },
+
+    startStep(name, label, detail) {
+      if (!steps.has(name)) {
+        const d = row(STEP_LABEL[name] || label || name, '');
+        steps.set(name, d);
+      }
+      const d = steps.get(name);
+      d.querySelector('.ic').className = 'ic run';
+      d.querySelector('.ic').textContent = '◐';
+      d.querySelector('.dt').textContent = detail || '进行中…';
+      return d;
+    },
+
+    endStep(name, detail, ok = true) {
+      const d = steps.get(name);
+      if (!d) return;
+      d.querySelector('.ic').className = 'ic ' + (ok ? 'ok' : 'err');
+      d.querySelector('.ic').textContent = ok ? '✓' : '✕';
+      d.querySelector('.dt').textContent = detail || '';
+      d.classList.toggle('fold', (detail || '').length > 40);
+    },
+
+    freeLine(text) { return row('', text); },
+
+    /** 推理/抽取原文：堆在面板里的 <pre>，默认只显示尾巴 */
+    pushReasoning(t) {
+      if (!reasoningEl) {
+        reasoningEl = document.createElement('pre');
+        reasoningEl.className = 'raw';
+        body.appendChild(reasoningEl);
+      }
+      reasoningEl.textContent += t;
+      reasoningEl.scrollTop = reasoningEl.scrollHeight;
+    },
+
+    toolLine(name, args, status, ms) {
+      const label = status === 'running' ? '⟳' : '✓';
+      const d = row(`工具 ${name}`, '');
+      d.querySelector('.ic').className = 'ic ' + (status === 'running' ? 'run' : 'ok');
+      d.querySelector('.ic').textContent = label;
+      const dt = d.querySelector('.dt');
+      dt.innerHTML = '';
+      const b = document.createElement('span');
+      b.className = 'badge ' + (status === 'running' ? '' : 'ok');
+      b.textContent = status === 'running' ? '执行中' : `完成 ${ms}ms`;
+      dt.append(b, document.createTextNode(' ' + JSON.stringify(args)));
+      return d;
+    },
+
+    summary(s) { head.querySelector('.sum').textContent = s; },
+
+    /** 面板收尾：默认折叠，摘要里给出「发生了什么」 */
+    finish(summary, keepOpen = false) {
+      this.summary(summary);
+      if (!keepOpen) proc.dataset.open = '0';
+    },
+
+    open() { proc.dataset.open = '1'; },
+
+    /** 错误：面板保持展开、摘要变红，且**必须有明确的终态** */
+    fail(msg) {
+      proc.dataset.open = '1';
+      head.querySelector('.sum').innerHTML =
+        `<span style="color:var(--err)">✕ 出错了</span>`;
+      const e = document.createElement('div');
+      e.className = 'errbox';
+      e.style.marginTop = '8px';
+      e.textContent = msg;
+      this.el.insertBefore(e, this.el.firstChild);
+    },
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// 三、发送 + 事件循环（状态机，不是 if 链）
+// ══════════════════════════════════════════════════════════════
+
+const msgs = $('#msgs');
+
+function addUser(text) {
+  const d = document.createElement('div');
+  d.className = 'msg user';
+  d.innerHTML = `<div class="bubble"></div>`;
+  d.querySelector('.bubble').textContent = text;
+  msgs.appendChild(d);
+}
+
+async function send() {
+  const ta = $('#input');
+  const text = ta.value.trim();
+  if (!text || busy) return;
+  busy = true;
+  $('#send').disabled = true;
+  ta.value = '';
+
+  addUser(text);
+  const panel = makePanel();
+  msgs.appendChild(panel.el);
+  panel.open();                    // 过程进行中展开，完成后再折叠
+
+  const ctrl = new AbortController();
+  let terminal = false;            // ← 关键：是否收到过终止帧
+  let replyBuf = '';
+  let frameCount = 0;
+
+  try {
+    const resp = await fetch('/api/chat/stream', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+      body: JSON.stringify({ text, session_id: sessionId }),
+      signal: ctrl.signal,
+    });
+
+    // ⚠️ 头发出**之前**的错误（400 参数错 / 429 限流 / 401）走这里。
+    //    一旦头发出去了，HTTP 状态就永远是 200，错误只能靠 error 帧。
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      throw new Error(j.error || `请求失败 (${resp.status})`);
+    }
+    if (!resp.body) throw new Error('当前浏览器不支持流式响应 (ReadableStream)');
+
+    for await (const ev of sseEvents(resp, ctrl.signal)) {
+      frameCount++;
+      const e = ev.data;
+      switch (e.kind) {
+        case 'hello':
+          panel.summary('已连接，等待模型…');
+          break;
+
+        case 'route':
+          panel.freeLine(`路由 → ${e.label || e.engine}（${e.reason || ''}）`);
+          break;
+
+        case 'step':
+          if (e.status === 'start') panel.startStep(e.name, e.label);
+          else panel.endStep(e.name, e.detail, e.status !== 'failed');
+          break;
+
+        case 'profile':
+          panel.endStep('extract',
+            Object.entries(e.profile || {}).map(([k, v]) => `${k}=${v}`).join(' · ') || '无新信息');
+          break;
+
+        case 'token':
+          // 只有 reply 目标才进正文；reasoning 目标进面板（可折叠）
+          if (e.target === 'reply') {
+            replyBuf += e.text;
+            panel.ensureReply().textContent = replyBuf;
+          } else {
+            panel.pushReasoning(e.text);
+          }
+          break;
+
+        case 'tool':
+          if (e.status === 'running') panel.toolLine(e.name, e.args, 'running');
+          else panel.toolLine(e.name, e.args, 'ok', e.ms);
+          break;
+
+        // 治理决策：老接口里隐式发生的事，流式下要能看见
+        case 'decision':
+          panel.freeLine(`⚠ ${e.label}`);
+          break;
+
+        case 'done':
+          terminal = true;
+          sessionId = e.result.session_id;
+          // done 里带的是**权威全文**：以它覆盖流式拼接的结果，
+          // 消掉「清理/兜底改过正文」造成的差异（老逻辑 _clean_reply 会改字）
+          if (e.result.reply) panel.ensureReply().textContent = e.result.reply;
+          panel.finish(describe(e.result), false);
+          break;
+
+        case 'error':
+          terminal = true;
+          panel.fail(e.message || '未知错误');
+          if (replyBuf) panel.ensureReply().textContent = replyBuf;
+          break;
+
+        default:
+          break;
+      }
+      scrollDown();
+    }
+
+    // ⚠️⚠️ 最容易漏的一条：流正常 EOF 但没收到 done/error。
+    //    原因可能是反代超时切断、后端进程被杀、生成器提前 return。
+    //    不处理就是「永远转圈」—— 这正是需求 5 要防的那类 bug。
+    if (!terminal) {
+      panel.fail('连接提前结束，没有收到完整结果。可以重试一次。');
+      if (replyBuf) panel.ensureReply().textContent = replyBuf + ' …';
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      panel.fail('已取消');
+      panel.finish('已取消', true);
+    } else if (!terminal) {
+      // ⚠️ 兜底：任何没被 error 帧覆盖的异常，都要把面板落到终态
+      panel.fail(err.message || String(err));
+      panel.finish('请求失败', true);
+    }
+  } finally {
+    // ⚠️ 终态清理放 finally —— 上面的任何分支漏了都不会卡住输入框
+    busy = false;
+    $('#send').disabled = false;
+    scrollDown();
+    $('#input').focus();
+  }
+}
+
+function describe(r) {
+  const bits = [`第 ${r.turn} 轮`];
+  if (r.tool_calls && r.tool_calls.length) bits.push(`${r.tool_calls.length} 个工具`);
+  if (r.action) bits.push(r.action);
+  const dec = r.decision || [];
+  if (dec.some((d) => d.kind === 'boundary')) bits.push('超出数据范围');
+  if (dec.some((d) => d.kind === 'tool_no_text')) bits.push('正文来自兜底');
+  if (r.delegated_to) bits.push(`由 ${r.delegated_to.name} 答`);
+  if (r.ready) bits.push('画像已齐');
+  return bits.join(' · ');
+}
+
+function scrollDown() {
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+$('#send').onclick = send;
+$('#input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+document.querySelectorAll('.toolbar button').forEach((b) => {
+  b.onclick = async () => {
+    const [plan, fail] = b.dataset.mode.split(':');
+    const q = new URLSearchParams({ plan });
+    if (fail) q.set('fail_at', fail);
+    await fetch('/api/_mode?' + q);
+    b.style.color = '#5b8def';
+  };
+});
+</script>
+</body>
+</html>
