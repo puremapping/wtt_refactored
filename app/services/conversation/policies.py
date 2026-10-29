@@ -7,6 +7,8 @@
 """
 from typing import TYPE_CHECKING
 
+import re
+
 from app.services import cities
 from app.services.conversation.profile import _clean_field_value
 
@@ -54,7 +56,17 @@ def _is_generate_intent(user_text: str) -> bool:
         "看看行程", "看行程", "出方案", "怎么玩", "怎么安排",
         "换一批", "重新来", "再来一版",
     ]
-    return any(k in t for k in triggers)
+    if any(k in t for k in triggers):
+        return True
+    # ⚠️ 「排一天的行程」「排 6 小时」这种最自然的说法不含上面任何整词 ——
+    #    实测「北京帮我排一天的行程」被判成没意图，行程永远生成不出来。
+    #    用正则补：排 + 可选量词 + 数字/中文数 + 天/小时/日。
+    #    不能简单加「排」，否则「排队」「安排」都会误触发。
+    if re.search(r"排\s*[个一]?\s*[0-9一二三四五六七八九十两]+\s*(天|日|小时|钟头)", t):
+        return True
+    if re.search(r"(一天|两天|半天|一日|两日).{0,4}(行程|路线|路线图)", t):
+        return True
+    return False
 
 
 def _should_allow_propose(user_text: str) -> bool:

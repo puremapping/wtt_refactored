@@ -21,6 +21,16 @@ def _require_agency(user):
     return user["org_id"], None
 
 
+@router.get("/protocols")
+def api_protocols():
+    """外部智能体可选的协议（给 /console 表单的下拉用）
+
+    ⚠️ 不需要认证 —— 只是静态选项清单，不含任何凭据或机构信息。
+    """
+    from app.services.agent_protocols import protocol_choices
+    return {"items": protocol_choices()}
+
+
 @router.get("")
 def api_list_agents(user=Depends(require_user)):
     team_id, err = _require_agency(user)
@@ -44,7 +54,8 @@ async def api_create_agent(request: Request, user=Depends(require_user)):
             prompt=body.get("prompt", ""),
             kind=body.get("kind", "builtin"),
             endpoint=body.get("endpoint", ""),
-            auth=body.get("auth", ""))
+            auth=body.get("auth", ""),
+            protocol=body.get("protocol", "generic"))
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     return {"id": aid, "ok": True}
@@ -69,7 +80,8 @@ async def api_update_agent(agent_id: str, request: Request,
         return err
     body = await request.json()
     fields = {k: body[k] for k in
-              ("name", "region", "description", "prompt", "endpoint", "auth")
+              ("name", "region", "description", "prompt", "endpoint", "auth",
+               "protocol")
               if k in body}
     ok = agent_svc.update_agent(agent_id, team_id, **fields)
     return {"ok": ok}

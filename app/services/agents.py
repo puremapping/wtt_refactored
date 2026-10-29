@@ -56,11 +56,13 @@ def _public(row: dict) -> dict:
 def create_agent(team_id: str, creator_id: str, name: str,
                  region: str = "", description: str = "",
                  prompt: str = "", kind: str = "builtin",
-                 endpoint: str = "", auth: str = "") -> str:
+                 endpoint: str = "", auth: str = "",
+                 protocol: str = "generic") -> str:
     """建智能体。
 
     kind='builtin'  —— 平台内自建，靠 prompt 调 GLM（默认）
     kind='external' —— 外部注册，靠 endpoint 转发（prompt 可空）
+    protocol        —— 仅 external 有意义：generic | dify | coze
     """
     if not (name or "").strip():
         raise ValueError("智能体名称不能为空")
@@ -69,17 +71,21 @@ def create_agent(team_id: str, creator_id: str, name: str,
     if kind == "external" and not (endpoint or "").strip():
         raise ValueError("外部智能体必须填写调用地址")
 
+    from app.services.agent_protocols import get_protocol
+    proto = get_protocol(protocol).key      # 不认识的一律落成 generic
+
     aid = uuid.uuid4().hex[:16]
     now = _now()
     with connect() as conn:
         conn.execute(
             "INSERT INTO agents "
             "(id,team_id,creator_id,name,region,description,prompt,status,"
-            " kind,endpoint,auth,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " kind,endpoint,auth,protocol,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (aid, team_id, creator_id, name.strip(), region.strip() or None,
              description.strip() or None, prompt.strip() or None, "draft",
-             kind, endpoint.strip() or None, auth.strip() or None, now, now))
+             kind, endpoint.strip() or None, auth.strip() or None, proto,
+             now, now))
     return aid
 
 
@@ -95,7 +101,8 @@ def update_agent(agent_id: str, team_id: str, **fields) -> bool:
        - 字段出现且非空        → 覆盖
        - 字段出现且为空字符串   → 清空（前端「清除鉴权」勾选框）
     """
-    allowed = ("name", "region", "description", "prompt", "endpoint", "auth")
+    allowed = ("name", "region", "description", "prompt", "endpoint", "auth",
+               "protocol")
     sets = {k: v for k, v in fields.items() if k in allowed}
     if not sets:
         return False
@@ -103,6 +110,11 @@ def update_agent(agent_id: str, team_id: str, **fields) -> bool:
     # auth 空串 → 存 NULL（库里 empty 和 NULL 都表示「没有」，统一成 NULL）
     if sets.get("auth") == "":
         sets["auth"] = None
+
+    # protocol 落成已知 key，脏值不写库
+    if "protocol" in sets:
+        from app.services.agent_protocols import get_protocol
+        sets["protocol"] = get_protocol(sets["protocol"]).key
 
     args = list(sets.values()) + [_now(), agent_id, team_id]
     with connect() as conn:
@@ -183,6 +195,13 @@ def route_agent_by_region(region: str) -> Optional[dict]:
 
     匹配：region 完全等于，或互相包含（「成都」能匹到「成都市」）
 
+    ⚠️ 多个智能体覆盖同一地区时的选取规则（之前没定，实测踩到）：
+       ① 精确匹配优先于互相包含 —— 「成都」选中 region='成都' 的，
+          不会因为遍历顺序被 region='成都市' 的抢先
+       ② 同级里**最新发布的优先** —— 文旅局发新版换掉旧版，应当立刻生效，
+          而不是被库里冲在前面的旧记录顶掉
+       加 ORDER BY 之前，选中谁完全看 SQLite 的返回顺序，是不可控的。
+
     ⚠️ 这是**取数据**。要拿来回答问题的，用 `find_region_agent()` ——
     它返回统一抽象 RegionAgent，两条轨对调用方同形。
     """
@@ -192,16 +211,23 @@ def route_agent_by_region(region: str) -> Optional[dict]:
         rows = conn.execute(
             "SELECT a.*, t.name AS team_name FROM agents a "
             "JOIN teams t ON t.id = a.team_id "
-            "WHERE a.status='published' AND a.deleted_at IS NULL").fetchall()
+            "WHERE a.status='published' AND a.deleted_at IS NULL "
+            "ORDER BY a.updated_at DESC, a.created_at DESC").fetchall()
 
     key = region.strip()
+    exact, fuzzy = [], []
     for r in rows:
         rr = (r["region"] or "").strip()
         if not rr:
             continue
-        if rr == key or rr in key or key in rr:
-            return dict(r)
-    return None
+        if rr == key:
+            exact.append(r)
+        elif rr in key or key in rr:
+            fuzzy.append(r)
+
+    # rows 已按最新优先排序，两个桶都保持这个顺序
+    pick = exact[0] if exact else (fuzzy[0] if fuzzy else None)
+    return dict(pick) if pick else None
 
 
 def find_region_agent(region: str, **kwargs):

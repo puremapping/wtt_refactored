@@ -101,7 +101,7 @@ async def chat(request: Request, user=Depends(current_user_optional)):
 
         if name == "generate_itinerary":
             try:
-                exclude = flow.regen_exclude(user_text, args, current_itinerary)
+                exclude = flow.regen_exclude(text, args, current_itinerary)
                 d = flow.generate_itinerary(sid, args.get("hours"),
                                             exclude=exclude, user_id=uid)
                 result["itinerary"] = d

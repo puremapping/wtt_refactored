@@ -168,23 +168,27 @@ class ExternalAgent(RegionAgent):
 
     只做**转发**，不打包对方的运行时 —— 对方用什么引擎与我们无关。
 
-    请求体（本项目定义的统一协议）：
-        {"question": "...", "region": "...", "context": {...}}
-    对方可以返回：
-        {"answer": "..."}   或   纯文本
+    请求体与响应格式由 `protocol` 字段决定（见 app/services/agent_protocols.py）：
+      generic —— 本项目统一协议 {"question","region","context"}
+      dify    —— Dify Service API {"inputs","query","response_mode","user"}
+    留空/不认识的一律按 generic 处理。
 
     鉴权放在 agents.auth 里，格式 `Bearer xxx` / `Token xxx`，
     原样塞进 Authorization 头。留空则不带。
     """
 
     kind = "external"
-    TIMEOUT = 8          # 秒。外部智能体是别人的服务，必须设上限
+    TIMEOUT = 20         # 秒。Dify 走大模型可能要十几秒，8 秒会误判超时
 
     def __init__(self, row: dict, opener=None):
         """opener 可注入（测试用）—— 签名 (url, data, headers, timeout) -> bytes"""
         super().__init__(row)
         self.endpoint = (row.get("endpoint") or "").strip()
         self.auth = (row.get("auth") or "").strip()
+
+        from app.services.agent_protocols import get_protocol
+        self.protocol = get_protocol(row.get("protocol"))
+
         self._opener = opener or _default_opener
 
     def answer(self, question: str, context: Optional[dict] = None) -> Answer:
@@ -194,7 +198,12 @@ class ExternalAgent(RegionAgent):
         if not self.endpoint:
             return Answer("", degraded=True, reason="缺少调用地址")
 
-        payload = {"question": q, "region": self.region, "context": context or {}}
+        payload = self.protocol.build_payload(
+            question=q,
+            region=self.region,
+            context=context or {},
+            agent_id=self.row.get("external_id") or "",
+        )
         headers = {"Content-Type": "application/json"}
         if self.auth:
             headers["Authorization"] = self.auth
@@ -202,39 +211,24 @@ class ExternalAgent(RegionAgent):
         try:
             raw = self._opener(self.endpoint, payload, headers, self.TIMEOUT)
         except urllib.error.HTTPError as e:
-            return Answer("", degraded=True, reason=f"外部智能体返回 {e.code}")
+            # 把对方返回的错误正文带出来，不然只能看到「502」这种没用的信息
+            detail = ""
+            try:
+                detail = (e.read() or b"").decode("utf-8", "replace")[:200]
+            except Exception:
+                pass
+            return Answer("", degraded=True,
+                          reason=f"外部智能体返回 {e.code}：{detail}".rstrip("："))
         except Exception as e:
             return Answer("", degraded=True, reason=f"外部智能体调用失败: {e}")
 
-        return self._parse(raw)
-
-    @staticmethod
-    def _parse(raw: Any) -> Answer:
-        if isinstance(raw, bytes):
-            try:
-                raw = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                return Answer("", degraded=True, reason="外部返回非 UTF-8")
-        if not isinstance(raw, str):
-            return Answer("", degraded=True, reason="外部返回类型异常")
-
-        text = raw.strip()
-        if not text:
-            return Answer("", degraded=True, reason="外部返回空")
-
-        # 先试 JSON（{"answer": "..."}），失败就当纯文本
         try:
-            obj = json.loads(text)
-            if isinstance(obj, dict):
-                for key in ("answer", "text", "content", "reply"):
-                    v = obj.get(key)
-                    if isinstance(v, str) and v.strip():
-                        return Answer(v.strip())
-            elif isinstance(obj, str) and obj.strip():
-                return Answer(obj.strip())
-        except json.JSONDecodeError:
-            pass
+            text = self.protocol.parse_response(raw)
+        except Exception as e:
+            return Answer("", degraded=True, reason=f"解析外部返回失败: {e}")
 
+        if not text:
+            return Answer("", degraded=True, reason="外部返回内容里没有回答")
         return Answer(text)
 
 

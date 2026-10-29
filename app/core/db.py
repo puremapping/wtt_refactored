@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS agents (
     external_id TEXT,                     -- 对应 Coze bot_id（暂空）
     endpoint    TEXT,                     -- external 轨的调用地址（POST 到它）
     auth        TEXT,                     -- external 轨的鉴权头原值，如 `Bearer xxx`
+    protocol    TEXT NOT NULL DEFAULT 'generic', -- external 轨的协议：generic | dify | coze
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
     deleted_at  TEXT
@@ -247,6 +248,8 @@ def _migrate(conn):
         ("kind", "TEXT NOT NULL DEFAULT 'builtin'"),
         ("endpoint", "TEXT"),
         ("auth", "TEXT"),
+        # 外部轨协议适配（P5）：老记录按通用协议跑，行为与之前一致
+        ("protocol", "TEXT NOT NULL DEFAULT 'generic'"),
     ):
         if name not in cols("agents"):
             conn.execute(f"ALTER TABLE agents ADD COLUMN {name} {decl}")
