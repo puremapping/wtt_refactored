@@ -5,93 +5,17 @@ status: doing
 canonical_repo: true        # ★ 本项目为主干，旧库 where_to_travel 已冻结
 tags: [education/course, travel, llm, recommendation, fastapi, beijing-opendata, amap, function-calling, auth, analytics]
 created: 2026-09-17
-last_used: 2026-10-26
+pms_format: 1.0          # PMS 文档集格式版本（见 Forgejo jiya/format-library）
+last_used: 2026-10-29
 sp_project: null
 temporary_owner: null
 archive_path: null
 context:
   goal: "课程作业 → 目标是能落地。以 AI 对话为核心入口的旅游决策平台，先挖 Travel for What（动机），再推荐去哪，给出可解释推荐与一日行程预演。北京真实数据。"
   next: |
-    ★ 2026-10-26 交接完成，本仓库为主干。详见 HANDOVER.md。
-    ★ 2026-10-26 阿哲定：库名沿用 wtt_refactored，不改。
-
-    【P1｜✅ 已完成 2026-10-29】智能体路由打通
-      · P1-1 统一抽象：app/services/agent_runtime.py
-        RegionAgent 契约（region + answer()），BuiltinAgent 调 GLM，
-        ExternalAgent 转发 HTTP，build_agent 按 kind 分派。
-        agents 表加 kind/endpoint/auth 三列。
-      · P1-2 主流程路由：app/services/conversation/routing.py + orchestrator._try_delegate
-        用户提到地区 → 有已发布智能体 → 交给它；本地引擎要排行程时不接管。
-        find_region_agent() 返回可直接 answer() 的对象。
-      · 实测：北京问答交给「北京文旅bot」；排行程/未提城市/无智能体城市均走本地引擎。
-      · 测试 192 passed（含新增 75 项，零真实 LLM、零真实外网）。
-
-    【P1 遗留｜下一步】
-      · 数据缺口：成都现在有景区名录了，但**没有 transport / crowd_index**。
-        市级开放平台未开放这两类数据集，第三方转载源不合规，暂不接。
-        影响：成都的行程生成会退化为「只按等级和距离排」，
-        没有地铁/公交信息、没有实时人流。这是已知缺口，不是 bug。
-
-    【P4｜✅ 已完成 2026-10-29】成都景区数据 + 智能体接库
-      · 数据源：四川省文旅厅《四川省A级旅游景区名录》（wlt.sc.gov.cn，2026-01-07）
-        全省 988 条，成都 103 条（5A 3 / 4A 49 / 3A 39 / 2A 11 / 1A 1）。
-        ⚠️ 成都市公共数据开放平台（chengdu.gov.cn/data/oportal）**没有**景区数据集，
-        市级部门未开放 —— 已实测翻过目录。省级名录是能拿到的最权威源。
-      · 脚本：app/scripts/fetch_chengdu.py → data/raw/chengdu_attractions.csv（入库归档）
-              app/scripts/import_chengdu.py → 写库 + 高德补坐标
-      · 坐标：103/103（100%）。⚠️ 高德个人认证 QPS 实测约 3 次/秒，
-        0.12 秒间隔会被限流（CUQPS_HAS_EXCEEDED_THE_LIMIT），已改 0.4 秒 + 退避重试。
-      · 城市注册表现有：北京 212 + 成都 103 = 315，坐标覆盖 315/315。
-      · app/services/agent_facts.py：给智能体查本地景点事实
-        - 按用户提到的区县过滤，区县无数据时退回全市
-        - 格式化成 prompt 片段，明确要求「只能用清单里的名字」
-        - 查库失败降级为自由发挥，不崩
-      · 实测：问「龙泉驿区有什么」→ 洛带古镇/桃花故里/蔚然花海，全部在库且同区
-      · 测试 226 passed。
-
-    【P3｜✅ 已完成 2026-10-29】外部轨前端表单
-      · /console 表单加「类型」选择（平台内自建 / 外部智能体），按类型切换字段：
-        builtin → 人设话术；external → 调用地址 + 鉴权方式。
-      · 卡片显示类型标签与 endpoint / 「已设置鉴权」状态。
-      · 安全：auth 明文**永不回传前端**，列表与详情只给 has_auth 布尔。
-      · auth 三态语义：不传=不改 / 非空=覆盖 / 空串=清空（前端有「清除」勾选框）。
-      · 类型创建后不可改（两条轨准入条件不同，换轨会让合法记录变不合法）。
-      · 浏览器实机验证通过：新建 → 编辑留空不改 → 勾选清除 → 落库核对。
-      · 测试 206 passed。
-
-    【P2 待办｜对话交互整体重设计（阿哲 2026-10-29 定：等会做，属大规模改）】
-      · 现象：用户说「帮我排一天的行程」时，模型只用文字描述行程，
-        不调 generate_itinerary，右侧行程卡片不生成（tool_calls 空、无 itinerary 字段）。
-      · ⚠️ 阿哲明确：这一块属于对话过程中的前端 / 交互设计问题，
-        需要**大规模重新设计**，不只是补一个兜底。
-      · 因此不要用小补丁修 —— 留作独立设计任务，等正式排期。
-        （底层观察：反向补齐 _is_generate_intent 与模型实际行为不一致；
-         但修法要放进整个对话交互重设计里一起考虑。）
-
-    【P2】双轨智能体架构（阿哲 2026-10-26 提出，替代「全用 Coze」方案）
-      · 轨道 A｜简易版自建：文旅局在我们平台填 prompt + 数据，直接用 GLM 跑。
-        适合大多数文旅局，零额外部署。
-      · 轨道 B｜外部智能体注册：有进阶需求的文旅局用 Dify / Coze 自己建，
-        然后到我们平台「注册」——填名称、覆盖地区、调用地址、鉴权方式，
-        我们暴露统一接口转发。平台不打包它们的运行时，只做注册与路由。
-      · ⚠️ 关键设计：两条轨道的智能体对主流程是**同一种东西**——
-        统一成「有 region + 可调用」的抽象，chat 只认这个抽象，不关心谁造的。
-      · 好处：Coze 那 12 容器从「必选项」降级为「进阶用户自选」，平台保持轻。
-
-    【P3】简易版自建的字段（轨道 A 需要）
-      现在 agents 表只有 name/region/description/prompt —— 够用；
-      但缺「本地数据」（景区清单），要么接上传，要么先只用 prompt 回答。
-
-    【P4】图片上传接口（现在帖子卡片是占位图）
-    【P5】README 入口地址过时（/ 已改浏览页，/chat 才是对话页）
-    【P6】旅游回忆的 AI 总结只有接口，未接 LLM 生成
-
-    历史待办：
-    1. 直线距离 → 接高德路径规划 API
-    2. 数据覆盖：只有北京 212 个景区（主要瓶颈）
-    3. 密码重置（需邮件服务）
-    4. 同名区歧义：北京/成都都有「朝阳区」，无上下文按景区数多者解析
-
+    ★ 计划与分期见 PLAN.md（唯一真相源）。本字段只留指针，不装完整计划 —— 2026-10-29 阿哲定。
+    ★ 当前：P1-P6 全部完成（智能体双轨 + 成都数据 + Dify 协议适配 + 对话身份标识，275 passed）。
+    ★ 下一步：大改「对话交互整体重设计」未开始，详见 PLAN.md 同名条目。
   decided: |
     - 【2026-10-26 阿哲定 3 条】
       · 库名沿用 wtt_refactored（沿袭历史，不改回 where_to_travel）
