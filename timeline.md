@@ -47,3 +47,4 @@
 - 2026-10-25: **Phase 2c 多城市彻底隔离** —— transport/crowd_index 加 city 列（真库迁移无损）；join 按 (名称,城市) 双条件，同名景点数据不串；管线全贯通城市维度
 - 2026-10-25: Phase 2d/3 —— 删死代码与 6 个零使用依赖；pyproject.toml 收敛；静态资源自动版本号（根治手动 ?v=N）；start/dev/kill 启动脚本；README/DESIGN/sessions/timeline 全部同步；**117 项测试全绿**
 - 2026-10-29: HANDOVER.md 归档到 docs/archive/HANDOVER_20261026.md —— 交接事项（P1 智能体路由）已全部执行完毕，按 PMS 规范 close 掉，文件头加归档 banner 指向 PLAN.md；git 识别为 rename，历史链保留
+- 2026-10-29: 双线并行启动（阿哲定）—— 拆出 wtt_ux-refactor/（交互设计重构）与 wtt_miniapp/（平台接入小程序）两个子项目，共用父仓库

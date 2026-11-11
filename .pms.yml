@@ -12,10 +12,12 @@ temporary_owner: null
 archive_path: null
 context:
   goal: "课程作业 → 目标是能落地。以 AI 对话为核心入口的旅游决策平台，先挖 Travel for What（动机），再推荐去哪，给出可解释推荐与一日行程预演。北京真实数据。"
+
   next: |
-    ★ 计划与分期见 PLAN.md（唯一真相源）。本字段只留指针，不装完整计划 —— 2026-10-29 阿哲定。
-    ★ 当前：P1-P6 全部完成（智能体双轨 + 成都数据 + Dify 协议适配 + 对话身份标识，275 passed）。
-    ★ 下一步：大改「对话交互整体重设计」未开始，详见 PLAN.md 同名条目。
+    ★ 计划与分期见 PLAN.md（唯一真相源）。本字段只留指针。
+    ★ 双线并行（2026-10-29 阿哲定）：
+      · wtt_ux-refactor/ —— 交互设计重构（本线继续推进，当前 P2 有效推荐优先）
+      · wtt_miniapp/     —— 平台接入小程序（另一个 session 平行推进）
   decided: |
     - 【2026-10-26 阿哲定 3 条】
       · 库名沿用 wtt_refactored（沿袭历史，不改回 where_to_travel）

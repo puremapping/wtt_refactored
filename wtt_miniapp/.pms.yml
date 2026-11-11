@@ -1,0 +1,23 @@
+# .pms.yml — 项目元信息
+name: wtt_miniapp
+version: 1.0.0
+status: doing
+tags: [wtt, miniapp, 小程序, integration]
+created: 2026-10-29
+last_used: 2026-10-29
+pms_format: 1.0
+sp_project: null
+temporary_owner: null
+archive_path: null
+context:
+  goal: "wtt 平台接入小程序 —— 让用户通过登录，把画像和行程注入景点讲解/领队类小程序的 LLM，实现个性化讲解"
+  next: "见 PLAN.md。本 line 由另一个 session 平行推进，本文件先立骨架、记录方向"
+  decided: |
+    - 双线并行：wtt_ux-refactor 负责交互设计重构；本子项目负责平台接入小程序（阿哲 2026-10-29）
+    - 方向和现有链路的关系：现在是把景点数据喂给文旅局智能体；这个是同一类动作（把 context 注入别的 LLM），换了服务对象（第三方小程序/设备）
+    - 卡点：平台能控的只有「画像 → 结构化 context」半段；「设备 → 接收」半段由景区/小程序方主导，要谈合作、等接口。这是商业问题，不是技术问题
+    - 技术侧不用调研：本质是把 conv.profile + 行程结构化输出成一段 context，接到新出口。想验证一两小时能出 demo
+    - 现状数据缺口：profile 字段偏薄（仅动机/时长/同伴/节奏/兴趣/避开），离「个性化讲解」需要粒度有距离
+    - 重启条件：阿哲决定真去谈景区合作，或需要先做「画像 → context」技术 demo
+  avoid: "不做欺骗性演示；不承诺平台做不到的个性化程度"
+  deps: [GLM API, 高德地图 API]
