@@ -41,6 +41,22 @@
 
 **6. 老师建议（阿哲转述）**：AI 交互设计可探索「生成式 UI」与「交互式视频」，参考成型产品。已派 3 个子代理调研（成型产品 / 概念边界可达性 / 本项目落地约束诊断）。此前查过 Google Research《Generative UI》与 Gemini dynamic view，材料在 waiting-and-process-visibility.md。
 
+**7. 三份报告收口（2026-11-12）**
+
+- `docs/research/generative-ui-landscape.md`（306 行）：12 个产品逐个拆。**澄清 GPT-6「Intelligent UI」不是生成式 UI**（是组件库+编译器），名字撞了 HCI 术语 IUI。Google 论文 82.8% 偏好的最大漏洞是**把速度拿掉**（生成 1–2 分钟）。
+- `docs/research/interactive-video-concept-and-feasibility.md`（42KB，44 来源）：四方向差三个数量级。放弃世界模型（官方自认无法精确模拟真实地点）、放弃分支叙事（Netflix 清零 20/24）、数字人不划算（中标 307.65 万 / 40 项交付）。
+- `wtt_ux-refactor/generative-ui-interactive-video-diagnosis.md`（306 行）：**本项目能做什么**。结论是「服务端确定性组件编排」，LLM 零参与界面生成。
+
+**关键诊断发现：分数压缩的真根因是数据契约，不是公式。**
+`build_candidates()` 把 score 与分项压成 9 元组时全丢，`to_dict()` 还 round(...,3)。
+`Scored` 缺 5 字段：score_breakdown / match_reasons / penalties+exclusion_reason / poi_type / data_confidence。
+这 6 项是「把已在算但没留下的东西留下」，零 LLM 零迁移，且同时服务推荐修复与生成式 UI。
+
+**8. 交接（2026-11-12）**
+
+上下文将压缩，本 session 交回父项目把控。写 `wtt_ux-refactor/HANDOVER.md`（十节，含已排除路径、三个坑、验收判据、环境坑），`next` 指向它。
+同时纠正 `.pms.yml` 里「优先」的措辞 —— 改为「并行两条线，冲突时以有效推荐裁决」。
+
 ### 留下的
 
 - wtt_ux-refactor/：.pms.yml / PLAN.md / timeline.md / sessions.md
