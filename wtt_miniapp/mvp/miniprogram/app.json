@@ -1,0 +1,12 @@
+{
+  "pages": [
+    "pages/guide/guide"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#0f1216",
+    "navigationBarTitleText": "狮子林 · 智能导览",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0f1216"
+  }
+}

@@ -28,6 +28,19 @@
 - eval-methods.md：K=5 时 Precision/MAP/MRR 全失效（实测复现，仅 NDCG 区分）；Booking 离线与业务 r=-0.1
 - quality-and-feasibility：高德可在线读评分但禁存储（协议 3.5）；5A 是便利性认证非价值认证；正解是 TOPTW 非 TSP
 
+**4. P2 诊断：跨画像 Top-5 Jaccard**
+
+原假设「等级塌缩导致推荐对动机不敏感」**被推翻**（大部分组合 Jaccard=0.0）。但发现三个更实际的问题，详见 PLAN.md：
+① 分数压缩到 0.005 级 ② 排除项一刀切误伤（故宫「恢复/逃离」下 0.099）
+③ 「美食/感官」与「文化/沉浸」完全相同（规则表缺美食信号）。
+脚本 `jaccard_diag.py` 已入库，可复现。
+
+**5. 优先级澄清（阿哲 2026-10-29 晚）**
+
+「有效推荐」与「优化使用体验」是**两条并行都要抓的线**，优先只在冲突时裁决，不是串行。此前我误读为「先做完推荐再做体验」，已改正 PLAN.md 措辞。
+
+**6. 老师建议（阿哲转述）**：AI 交互设计可探索「生成式 UI」与「交互式视频」，参考成型产品。已派 3 个子代理调研（成型产品 / 概念边界可达性 / 本项目落地约束诊断）。此前查过 Google Research《Generative UI》与 Gemini dynamic view，材料在 waiting-and-process-visibility.md。
+
 ### 留下的
 
 - wtt_ux-refactor/：.pms.yml / PLAN.md / timeline.md / sessions.md

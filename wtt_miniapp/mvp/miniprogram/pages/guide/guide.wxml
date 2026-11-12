@@ -1,0 +1,98 @@
+<view class="wrap">
+
+  <view class="hero">
+    <view class="eyebrow">扫码即用 · 苏州狮子林</view>
+    <view class="title">狮子林</view>
+    <view class="sub">AI 智能导览 · 不必思考，只是享受</view>
+  </view>
+
+  <!-- 登录态 -->
+  <view class="card">
+    <view class="label">平台账号</view>
+    <view class="value">{{loginStatus}}</view>
+
+    <block wx:if="{{stage === 'login'}}">
+      <view class="formlabel">邮箱</view>
+      <input class="input" type="text" value="{{email}}"
+             placeholder="平台账号邮箱" bindinput="onEmailInput" />
+
+      <view class="formlabel">密码</view>
+      <input class="input" password="true" value="{{password}}"
+             placeholder="平台账号密码" bindinput="onPasswordInput" />
+
+      <view class="hintline">点下面任一行可填入演示账号邮箱，密码仍需输入。</view>
+      <view class="userlist">
+        <view wx:for="{{users}}" wx:key="email"
+              class="useritem {{email === item.email ? 'sel' : ''}}"
+              data-email="{{item.email}}" bindtap="onSelectUser">
+          <view class="uname">{{item.nickname}}</view>
+          <view class="uhint">{{item.hint}}</view>
+          <view class="uemail">{{item.email}}</view>
+        </view>
+      </view>
+
+      <view class="btn primary" bindtap="doLogin">用平台账号登录</view>
+      <view class="note">R1：账密登录。小程序不带平台 cookie，登录后由平台签发 token。
+演示密码见 mvp/README.md。</view>
+    </block>
+
+    <block wx:if="{{stage === 'ready'}}">
+      <view wx:if="{{restored}}" class="restored">已用本地凭证免密恢复，无需输入账密</view>
+      <view class="btn primary" bindtap="loadContext">拉取画像 → 开始导览</view>
+      <view class="btn ghost" bindtap="reset">退出登录 / 换账号</view>
+    </block>
+
+    <block wx:if="{{stage === 'guide'}}">
+      <view class="btn ghost" bindtap="reset">退出登录 / 换账号</view>
+    </block>
+
+    <view wx:if="{{errorMsg}}" class="err">{{errorMsg}}</view>
+  </view>
+
+  <!-- 讲解 -->
+  <block wx:if="{{stage === 'guide'}}">
+
+    <view class="card">
+      <view class="label">讲解版本</view>
+      <view class="bigvalue">{{guideVersion}}</view>
+      <view wx:if="{{injected}}" class="tag ok">已注入个性化</view>
+      <view wx:else class="tag mid">未注入 · {{noInjectReason}}</view>
+      <view class="h">{{versionLead}}</view>
+      <view class="p">讲法：{{versionStyle}}</view>
+      <view wx:if="{{focus}}" class="p">侧重：{{focus}}</view>
+      <view wx:if="{{depth}}" class="p">深度：{{depth}}</view>
+      <view wx:if="{{abstract}}" class="p">画像概括（非原话）：{{abstract}}</view>
+      <view wx:if="{{avoidText}}" class="warn">硬约束（不要讲）：{{avoidText}}</view>
+    </view>
+
+    <view class="sectiontitle">今日路线 · 设计师预设</view>
+
+    <view wx:for="{{stops}}" wx:key="id" class="card stop">
+      <view class="stophead">
+        <text class="num">{{item.id}}</text>
+        <text class="sname">{{item.name}}</text>
+        <text wx:if="{{item.hit}}" class="tag ok sm">主题命中</text>
+      </view>
+      <view class="tagline">{{item.tag}}</view>
+      <view class="p">{{item.text}}</view>
+
+      <view wx:if="{{aiAnswers[item.id]}}" class="aianswer">
+        <view class="ailabel">AI 讲解 · 内容由 AI 生成，仅供参考</view>
+        <view class="aitext">{{aiAnswers[item.id]}}</view>
+      </view>
+      <view wx:if="{{aiLoading[item.id]}}" class="ailoading">正在生成讲解…</view>
+      <view wx:elif="{{!aiAnswers[item.id]}}" class="aibtn" data-id="{{item.id}}" bindtap="askAI">听 AI 讲这一站</view>
+    </view>
+
+    <view wx:if="{{aiError}}" class="err">{{aiError}}</view>
+
+    <view class="card">
+      <view class="label">注入到讲解 LLM 的 system prompt（真实组装结果）</view>
+      <view class="prompt">{{promptText}}</view>
+    </view>
+
+  </block>
+
+  <view class="foot">内容由 AI 生成，仅供参考 · MVP 演示，未调用大模型</view>
+
+</view>

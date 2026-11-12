@@ -1,0 +1,12 @@
+{
+  "appid": "touristappid",
+  "projectname": "wtt-miniapp-mvp",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false
+  }
+}
