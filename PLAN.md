@@ -5,6 +5,31 @@
 > 状态来源：本文件是**计划**的唯一真相源；`.pms.yml` 的 `context.next` 只有一行指针。
 > 阶段编号沿用项目历史的 P 编号，不重排——外面说过的话要对得上。
 
+## 双线视图（2026-11-12 起）
+
+父项目下并行两条线，**共用同一 git 仓库与 `app/` 代码**，按 PMS 子项目规范不单独 git init。
+
+| 线 | 目录 | 负责什么 | 当前状态 | 谁在推进 |
+|---|---|---|---|---|
+| 父项目 | `wtt_refactored/` | 整体把控、共享代码（`app/`）、公共数据 | P1–P6 完成 | 本 session |
+| 交互设计重构 | `wtt_ux-refactor/` | 推荐有效性 + 交互形态（生成式 UI / 视频方向） | 调研诊断完成，修复未开始 | 后续 session |
+| 平台接入小程序 | `wtt_miniapp/` | 把画像+行程注入景点讲解小程序 | MVP 代码已跑通 | 另一 session |
+
+**主干关系**：父项目是权威源（`canonical_repo: true`）；两条线最终都收敛回父项目的 `app/`。
+旧库 `where_to_travel` 已冻结，不向其提交。
+
+## 协作规矩（两条线共用一个 git）
+
+⚠️ **不要 `git add -A`。** 2026-11-12 实测：本线一次 `-A` 把 `wtt_miniapp/mvp/` 整批提交进了自己的 commit（`683c8b3`，留痕 `efdb5b4`）。
+
+三条规矩：
+
+1. **提交前先 `git status` 看一眼** —— 确认待提交的是自己这条线的文件
+2. **只 add 明确路径** —— `git add wtt_ux-refactor/ app/services/recommend.py`
+3. **commit message 开头标线** —— `[ux]` / `[miniapp]` / `[parent]`，31 个历史提交里光看 message 分不清哪条线
+
+**共享代码冲突怎么处理**：两条线都改 `app/` 时，后提交的一方 `git pull` 后手工对齐；改动前先 `git status` 确认工作区干净。
+
 ## 分期
 
 ### P1 智能体路由打通  ✅ 2026-10-29

@@ -48,3 +48,5 @@
 - 2026-10-25: Phase 2d/3 —— 删死代码与 6 个零使用依赖；pyproject.toml 收敛；静态资源自动版本号（根治手动 ?v=N）；start/dev/kill 启动脚本；README/DESIGN/sessions/timeline 全部同步；**117 项测试全绿**
 - 2026-10-29: HANDOVER.md 归档到 docs/archive/HANDOVER_20261026.md —— 交接事项（P1 智能体路由）已全部执行完毕，按 PMS 规范 close 掉，文件头加归档 banner 指向 PLAN.md；git 识别为 rename，历史链保留
 - 2026-10-29: 双线并行启动（阿哲定）—— 拆出 wtt_ux-refactor/（交互设计重构）与 wtt_miniapp/（平台接入小程序）两个子项目，共用父仓库
+- 2026-11-12: 定 git 协作规矩（不拆 repo、不开分支）—— 提交前看 status / 只 add 明确路径 / message 标 [ux][miniapp][parent]。起因：一次 git add -A 把另一条线整批提交
+- 2026-11-12: 父项目 PLAN.md 补「双线视图」+「协作规矩」两节

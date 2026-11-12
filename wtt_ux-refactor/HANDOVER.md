@@ -84,7 +84,13 @@ LLM 零调用的「生成式界面」
 
 本线曾因此把 `wtt_miniapp/mvp/` 整批提交进自己的 commit（commit `683c8b3`，留痕在 `efdb5b4`）。
 
-**正确做法**：`git add <明确路径>`。父项目任何一条线提交前先看 `git status`。
+**三条规矩（父项目 PLAN.md「协作规矩」节有完整版）**：
+
+1. 提交前先 `git status`
+2. 只 add 明确路径（`git add wtt_ux-refactor/ app/services/recommend.py`）
+3. commit message 开头标线：`[ux]` / `[miniapp]` / `[parent]`
+
+**共享代码冲突**：两条线都改 `app/` 时，后提交的一方 `git pull` 后手工对齐。
 
 ---
 
