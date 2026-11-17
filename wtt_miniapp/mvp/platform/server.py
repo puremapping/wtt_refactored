@@ -197,4 +197,5 @@ def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8100, log_level="info")
+    # 8100 是主项目 wtt_refactored 的默认端口，MVP 不占它，避免顶掉演示网站
+    uvicorn.run(app, host="127.0.0.1", port=8101, log_level="info")

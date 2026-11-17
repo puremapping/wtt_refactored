@@ -21,8 +21,9 @@
 
 ```bash
 cd wtt_miniapp/mvp
-bash start.sh          # 起三个服务：平台 8100 / 景区代理 8200 / 模拟器 3401
+bash start.sh          # 起三个服务：MVP 平台 8101 / 景区代理 8200 / 模拟器 3401
 # 浏览器打开 http://127.0.0.1:3401/
+# ⚠️ 主项目演示网站占 8100（uvicorn app.main:app），MVP 平台用 8101 避开，互不干扰
 ```
 
 依赖：Node ≥ 18、主项目 `.venv`（Python 3.13 + fastapi）、本机 Chrome（跑 e2e 用）。
@@ -76,7 +77,7 @@ node tests/e2e_ai.js     # AI 讲解真调 BUPT 网关（约 10-30 秒）
   │     登录成功把 token 存进 wx storage（不存密码）
   │  ② wx.request GET /api/context?token=...
   ▼
-wtt 平台侧 stub（FastAPI，本地 8100）
+wtt 平台侧 stub（FastAPI，本地 8101；8100 留给主项目演示网站）
   │  验密码（复用主项目 auth.verify_password）／校验 token（30 天 TTL）
   │  复用主项目 conversation/profile.py 的真实画像逻辑
   │  （public_profile / profile_summary / 占位词表）
