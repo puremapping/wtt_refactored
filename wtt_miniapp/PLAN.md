@@ -35,15 +35,25 @@
 - [x] **方案一：下次免密**（阿哲定先做）：平台 TTL 30 天 + `/api/auth/verify` 探活；模拟景区端 `utils/session.js` 存 token（不存密码）、失效静默退回账密
 - [x] 验收：单测 **20/20**、e2e **5 场景全过**（新增 E 免密场景）、主项目 **275 项零回归**
 
-**验收判据**（已实跑）
+### P3 AI 智能导览接入  ✅ 2026-11-13
+
+- [x] 阿哲给 BUPT 网关 key（`~/Desktop/wtt_miniapp_bupt.txt`），按纪律先枚举 `/v1/models` 再实测两个候选
+- [x] 选 `deepseek-v4-flash`（非推理、约省一半 token；`qwen3.8-27b` 43 个 reasoning tokens 白烧）
+- [x] 建 `mvp/scenic_proxy/`：模拟景区侧 AI 代理，服务端持 key、密钥零落前端
+- [x] 模拟景区端加「听 AI 讲这一站」，把平台注入的 `system_prompt` + 该站知识库交给代理
+- [x] 验收：`tests/e2e_ai.js` 真调网关，个性化长辈版讲解生成、AI 标识落地、零 JS 错误；单测 20/20、5 场景 e2e 全过、主项目 275 项零回归
+
+**验收判据**（已实跑，P2+P3 合计）
 ```
-cd wtt_miniapp/mvp && bash start.sh
+cd wtt_miniapp/mvp && bash start.sh   # 三个服务
 ../../.venv/Scripts/python.exe -m pytest tests/test_prompt_injection.py -q   → 20 passed
-MVP_URL=http://127.0.0.1:3403/ node tests/e2e.js   → 全部场景通过
+MVP_URL=http://127.0.0.1:3404/ node tests/e2e.js      → 5 场景全通过
+MVP_URL=http://127.0.0.1:3404/ node tests/e2e_ai.js   → AI 讲解真调通过
 cd ../.. && .venv/Scripts/python.exe -m pytest -q   → 275 passed（零回归）
 ```
 
-> ⚠️ 全部在 `wtt_miniapp/mvp/`，**主项目代码零改动**。真实集成要补的 9 项缺口见 `mvp/README.md` §五。
+> ⚠️ key 不进仓库/不打印/不进前端；BUPT 网关是校园内网，公网到不了，景区上线须换模型服务并自行备案。
+> ⚠️ 全部在 `wtt_miniapp/mvp/`，**主项目代码零改动**。真实集成要补的 10 项缺口见 `mvp/README.md` §五。
 
 ## 待议（未排期）
 

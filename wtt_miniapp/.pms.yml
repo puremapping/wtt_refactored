@@ -11,7 +11,7 @@ temporary_owner: null
 archive_path: null
 context:
   goal: "wtt 平台接入小程序 —— 让用户通过登录，把画像和行程注入景点讲解/领队类小程序的 LLM，实现个性化讲解"
-  next: "见 PLAN.md / DESIGN.md / mvp/README.md。P0-P2 已完成；待阿哲定 D2（选 R1 / R2 / R3）"
+  next: "见 PLAN.md / DESIGN.md / mvp/README.md。P0-P3 已完成（含 AI 讲解真调）；待阿哲定 D2（选 R1 / R2 / R3）"
   decided: |
     - 双线并行：wtt_ux-refactor 负责交互设计重构；本子项目负责平台接入小程序（阿哲 2026-10-29）
     - 方向和现有链路的关系：现在是把景点数据喂给文旅局智能体；这个是同一类动作（把 context 注入别的 LLM），换了服务对象（第三方小程序/设备）
@@ -31,8 +31,9 @@ context:
     - 补上真 R1 账密登录（初版只做票据壳子且不验密码，是设计失误），复用主项目 auth.verify_password；R1-3 定义已厘清，小程序机制上不携带平台 cookie，初版「跨站 cookie 需实测」作废
     - 方案一免密（阿哲定先做，2026-11-13 已实现）：平台 TTL 30 天 + GET /api/auth/verify 探活（失效返 {valid:false} 非 401）；模拟景区端 utils/session.js 存 token 不存密码、失效静默退回账密；不额外建微信账号体系（wx storage 按 AppID+微信用户由 runtime 隔离，那是 R2 才要的）
     - D2 仍待定：选 R1（当前）/ R2 微信 code 绑定（换设备也免密）/ R3 unionid。平台 users 表无任何微信身份字段、没接 wx.login、没建绑定表、没微信开放平台资质
-    - 真实集成仍必做：token 持久化/可撤销/绑真实身份/HTTPS、画像取真实 sessions.profile、景区侧备案与算法备案主体归属。完整 9 项缺口见 mvp/README.md §五
-    - 验收（2026-11-13 实跑）：单测 20/20、e2e 5 场景全过（A 完整画像 / B 稀薄退回通用 / C 占位词清洗 / D 错误密码拒绝 / E 免密恢复与退出）、主项目 275 项零回归
+    - 真实集成仍必做：token 持久化/可撤销/绑真实身份/HTTPS、画像取真实 sessions.profile、景区侧备案与算法备案主体归属。完整 10 项缺口见 mvp/README.md §五
+    - P3 AI 智能导览接入（阿哲 2026-11-13 给 BUPT 网关 key）：按 llm-api-scripting 纪律先枚举 /v1/models（6 个）再实测两个候选，选 deepseek-v4-flash（非推理、约省一半 token；qwen3.8-27b 有 43 个 reasoning tokens 白烧）。建 mvp/scenic_proxy/ 属模拟景区侧、服务端持 key、密钥零落前端；模拟景区端「听 AI 讲这一站」把平台注入的 system_prompt + 该站知识库交给代理。tests/e2e_ai.js 真调网关通过。⚠️ key 不进仓库/不打印/不进前端；BUPT 网关是校园内网（myai.bupt.edu.cn）只有本机能调，公网到不了，景区上线须换可公网访问的模型服务并自行完成算法备案
+    - 验收（2026-11-13 实跑）：单测 20/20、e2e.js 5 场景全过、e2e_ai.js AI 讲解真调通过、主项目 275 项零回归
     - 重启条件：阿哲决定真去谈景区合作，或需要把 MVP 并回主项目
   avoid: "不做欺骗性演示；不承诺平台做不到的个性化程度"
   deps: [GLM API, 高德地图 API]

@@ -2,6 +2,7 @@
 
 # wtt_miniapp 时间线
 
+- 2026-11-13: P3 AI 智能导览接入。阿哲给 BUPT 网关 key（`~/Desktop/wtt_miniapp_bupt.txt`）。按 llm-api-scripting 纪律先枚举 `/v1/models`（6 个）再实测两个候选，选 `deepseek-v4-flash`（非推理、约省一半 token；`qwen3.8-27b` 43 个 reasoning tokens 白烧）。建 `mvp/scenic_proxy/`（模拟景区侧、服务端持 key、密钥零落前端），模拟景区端加「听 AI 讲这一站」。`tests/e2e_ai.js` 真调网关通过：个性化长辈版讲解 + AI 标识落地 + 零 JS 错误。踩坑：curl 手写 JSON 被 shell 吃引号报 Missing messages，改 Python urllib 直发即通；按技能带浏览器 UA。⚠️ BUPT 网关是校园内网，公网到不了，景区上线须换模型服务并自行备案
 - 2026-11-13: P2 决策落地。D1 已定（阿哲）「不留原话，只导出概括」→ 结构性 pop 掉 `profile.summary`，只出 `abstract`；补上真 R1 账密登录（初版票据壳子不验密码是设计失误）；厘清 R1-3 定义（初版误以为 cookie 能跨到小程序侧）。**分工定位（阿哲）**：现在是模拟景区，以后小程序由景区做、景区备案，`mvp/miniprogram/` 是参考实现不是交付代码。**方案一免密**（阿哲定先做）：平台 TTL 30 天 + `/api/auth/verify` 探活，模拟景区端 `utils/session.js` 存 token 不存密码、失效静默降级。验收：单测 20/20、e2e 5 场景全过、主项目 275 项零回归
 - 2026-11-13: P1 技术半段 MVP 跑通（`mvp/`）。`open-wxa/wxa-runner` 在浏览器跑微信官方基础库 3.7.0，**不装 DevTools**；导出 + 画像→system prompt 组装 + 模拟景区端渲染。验收：单测 9/9、e2e 4 场景全过、主项目 275 项零回归。踩坑：Windows 下 `--host` 默认绑 IPv6 `[::1]`，须用不带值的 `--host`
 - 2026-11-12: 调研平台侧画像数据模型/数据导出 + 小程序侧账号登录/提示词注入，出 `RESEARCH-20261112.md`

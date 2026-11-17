@@ -93,6 +93,6 @@
 
   </block>
 
-  <view class="foot">内容由 AI 生成，仅供参考 · MVP 演示，未调用大模型</view>
+  <view class="foot">内容由 AI 生成，仅供参考 · 本地 MVP 演示</view>
 
 </view>

@@ -21,13 +21,18 @@
 
 ```bash
 cd wtt_miniapp/mvp
-bash start.sh
+bash start.sh          # 起三个服务：平台 8100 / 景区代理 8200 / 模拟器 3401
 # 浏览器打开 http://127.0.0.1:3401/
-# 平台 health：http://127.0.0.1:8100/health
 ```
 
 依赖：Node ≥ 18、主项目 `.venv`（Python 3.13 + fastapi）、本机 Chrome（跑 e2e 用）。
-**不需要**微信开发者工具、**不需要**任何 API key、**不需要**联网装基础库（已随 npm 依赖装好）。
+**不需要**微信开发者工具、**不需要**联网装基础库（已随 npm 依赖装好）。
+
+> ⚠️ **AI 讲解的 key**：阿哲放在 `C:/Users/mengzhe/Desktop/wtt_miniapp_bupt.txt`（单行裸 key）。
+> 也可用环境变量 `WTT_BUPT_API_KEY` 注入。**文件不进仓库、不打印、不进前端**；
+> 代理只在服务端读它。可用 `WTT_BUPT_KEY_FILE` / `WTT_BUPT_API_URL` / `WTT_BUPT_MODEL` 覆盖。
+> ⚠️ BUPT 网关是**校园内网**（`myai.bupt.edu.cn`），只有本机能调；**将来景区上线用不了这个 key**，
+> 景区需自备可公网访问的模型服务并自行完成算法备案。
 
 > ⚠️ Windows 上 `wxa-runner` 的 `--host` 默认是 `localhost`，会绑到 IPv6 `[::1]`，
 > 浏览器/curl 走 `127.0.0.1` 就连不上（实测 502 / ECONNREFUSED）。
@@ -39,23 +44,25 @@ bash start.sh
 # 单元测试（20 项，不需要起服务）
 ../../.venv/Scripts/python.exe -m pytest tests/test_prompt_injection.py -q
 
-# 端到端（需两个服务已起；在装了 playwright 的目录）
+# 端到端（需三个服务已起；在装了 playwright 的目录）
 npm install playwright@1.65.0 --no-save
-node tests/e2e.js
-# 若 runner 不在默认 3401：MVP_URL=http://127.0.0.1:3403/ node tests/e2e.js
+node tests/e2e.js        # 5 场景：登录/画像/免密/错误密码
+node tests/e2e_ai.js     # AI 讲解真调 BUPT 网关（约 10-30 秒）
+# 若 runner 不在默认 3401：MVP_URL=http://127.0.0.1:3404/ node tests/e2e.js
 ```
 
-**演示密码**：`wtt-mvp-demo`（三个演示账号共用，本地演示专用，非真实凭证）
+**演示密码**：`wtt-mvp-demo`（三个演示账号共用，本地演示专用，非真实凭证；可用 `MVP_DEMO_PASSWORD` 覆盖）
 
 实测结果：
 
 - 单元测试 **20/20 通过**
-- e2e **5 个场景全通过**，零 JS 运行时错误：
+- e2e **5 场景全通过**，零 JS 运行时错误：
   - A 完整画像 → 长辈版 / 深度文化侧重 / avoid 硬约束 / 只含结构化概括
   - B 稀薄画像 → 通用版、**不注入**
   - C 含占位词画像 → 占位词被清洗、不按「未知」选版本
   - D 错误密码 → 401 拒绝
   - E **方案一免密**：首次账密 → 关页重开免密恢复 → 退出登录后不再免密
+- **AI 讲解 e2e 通过**：真调 `deepseek-v4-flash`，返回个性化长辈版讲解、AI 生成标识落地、零 JS 错误
 - 主项目 `pytest -q` **275 项零回归**（改动全在 `mvp/`）
 
 ---
@@ -93,13 +100,15 @@ wtt 平台侧 stub（FastAPI，本地 8100）
 | 路径 | 内容 |
 |---|---|
 | `platform/server.py` | 平台侧：账密登录 + token 签发/校验/探活 + `/api/context` 导出 |
+| `scenic_proxy/server.py` | **模拟景区侧**：AI 讲解代理，服务端持 BUPT key，拼平台 prompt + 知识库调 `deepseek-v4-flash` |
 | `platform/prompt_injection.py` | 平台侧核心：字段映射、版本选择、system prompt 组装 |
 | `platform/fixtures.py` | 平台侧：3 个演示账号（完整 / 稀薄 / 含占位词） |
 | `miniprogram/utils/session.js` | 模拟景区端：token 存取（方案一免密的参考实现） |
-| `miniprogram/` | 模拟景区端：原生 WXML/WXSS/JS 小程序，1 个页面 |
+| `miniprogram/` | 模拟景区端：原生 WXML/WXSS/JS 小程序，1 个页面，含「听 AI 讲这一站」 |
 | `miniprogram/data/knowledge.js` | 模拟景区端：3 个站点静态知识库 + 设计师预设的 6 个讲解版本 |
 | `tests/test_prompt_injection.py` | 20 项单元测试 |
-| `tests/e2e.js` | 5 场景 Playwright 端到端 |
+| `tests/e2e.js` | 5 场景 Playwright 端到端（登录/画像/免密/错误密码） |
+| `tests/e2e_ai.js` | AI 讲解端到端（真调 BUPT 网关） |
 
 ### 落实的设计约束（DESIGN.md §一）
 
@@ -152,6 +161,65 @@ e2e 场景 E 验收：首次账密 → 关页重开免密恢复、不再出现�
 
 ---
 
+## 四·补二、AI 智能导览接入 ✅ 已实现（2026-11-13）
+
+**阿哲给了 BUPT 网关 key**（`C:/Users/mengzhe/Desktop/wtt_miniapp_bupt.txt`，单行裸 key）。
+
+### 架构（严格按分工，密钥零落前端）
+
+```
+模拟景区端小程序
+  │ 点「听 AI 讲这一站」
+  │ POST /api/guide/ask {system_prompt, knowledge, question}
+  │   ↑ system_prompt 来自 wtt 平台 /api/context
+  │   ↑ knowledge 是景区自己那一站的讲解稿
+  ▼
+模拟景区侧 AI 讲解代理（127.0.0.1:8200，服务端持 key）
+  │ 拼：平台注入 prompt + 景区知识库 + 「只依据知识库、答不出说咨询台」约束
+  │ POST https://myai.bupt.edu.cn/llm-gw/v1/chat/completions
+  ▼
+BUPT 网关 → deepseek-v4-flash → 返回讲解正文
+```
+
+**为什么单独一层代理**：小程序是纯客户端，写死在前端的 key 能被反编译看到（参考文档第 03 节「前端直连模型 API —— 生产环境不要这么做」）。密钥只在服务端从环境变量 `WTT_BUPT_API_KEY` 或本机文件读，**不进代码、不进仓库、不进前端**。
+
+**这一层属景区侧**，不是 wtt 平台契约。平台侧只负责导出 `injected_system_prompt`，不碰模型、不碰 key。
+
+### 模型选型（按 llm-api-scripting 技能纪律，先枚举再实测）
+
+先打 `/v1/models` 拿到 6 个模型，聊天可用的是 `deepseek-v4-flash` 与 `qwen3.8-27b`；**逐个发最小请求实测**：
+
+| 模型 | 结果 | tokens |
+|---|---|---|
+| `deepseek-v4-flash` ✅ 选用 | `好的呀`，`finish: stop` | 45（prompt 7 / completion 38） |
+| `qwen3.8-27b` | `你好呀`，`finish: stop`，但 43 个 reasoning tokens | 102（prompt 54 / completion 48） |
+
+选 flash：非推理模型、约省一半 token，讲解这种短文本任务不需要 thinking。
+
+**踩过的坑**：curl 里手写 JSON 被 shell 吃掉引号，网关报 `Missing required parameter: 'messages'`——改用 Python `urllib` 直发就通了。按技能纪律带浏览器 UA（该网关拦非浏览器 UA）。
+
+### prompt 约束
+
+代理把平台注入的 prompt 原样作为 system 主体，追加：
+
+- **知识库是唯一事实来源**：「只能依据上面知识库里的内容讲解，没有的一律说建议咨询景区服务台，不要编造」
+- **长度**：「一段话讲完，150 字以内，务必写完完整句子」——防止 `max_tokens` 中途截断
+- AI 生成标识写进 system 与页面（「AI 讲解 · 内容由 AI 生成，仅供参考」）
+
+平台侧原有约束全部继承：`BEGIN/END VISITOR CONTEXT` 分隔符、`avoid` 硬约束段、知识库 > 偏好的冲突优先级、不重排站点、不反问游客。
+
+### 实测输出（长辈版 · 假山迷宫）
+
+> 假山迷宫是狮子林的精华所在，占地约0.15公顷，由"透、漏、瘦、皱"的太湖石巧妙叠成，体现了古人独到的造园技艺。园中九条路线、二十一个洞口彼此贯通，取佛教"狮子座"与禅宗公案之意，变化无穷。元代画家倪瓒曾参与造园，假山的折转故意让人"看得到、走不到"，这种设计正是造园者对禅意与人生哲理的深刻表达。您不妨放慢脚步，与家人一同感受其中的巧思与意境。
+
+讲解按长辈版语速放缓、避开生僻术语，且**只用了知识库里的事实**，没编造门票/开放时间。
+
+### 验收
+
+`node tests/e2e_ai.js`：登录 → 拉 context → 点 AI 讲解 → 真调 BUPT 网关 → 断言答案生成、AI 标识落地、零 JS 错误。实测通过，`finish_reason: stop`。
+
+---
+
 ## 五、明确没做的事（真实集成时要补）
 
 | # | 缺口 | 说明 |
@@ -160,11 +228,12 @@ e2e 场景 E 验收：首次账密 → 关页重开免密恢复、不再出现�
 | 2 | **画像来自 fixtures** | 3 个演示账号是编的，不是真实用户。真实数据要走登录用户的会话 |
 | 3 | **token 内存实现** | 生产须持久化、可撤销、绑真实身份、HTTPS；当前重启即失效（小程序会静默退回账密） |
 | 4 | **R2/R3 未做** | 不接 `wx.login`、不建绑定表、不办微信开放平台资质。换设备仍要重输账密。见 DESIGN.md D2 |
-| 5 | **没调大模型** | 讲解正文来自静态知识库，按注入的侧重/深度做文本取舍。`injected_system_prompt` 是**真实组装结果**，景区方接 LLM 时可直接用，但本 MVP 没接。接入是景区侧的事（含类目与算法备案） |
+| 5 | **LLM 只接了模拟景区侧** | 见 §四·补二。`injected_system_prompt` 是平台侧真实组装结果，景区代理拿它 + 知识库调模型。平台侧契约不含模型调用 |
 | 6 | **知识库是静态 3 个站点** | 参考文档说讲解稿要按「景点/主题/人群」三维结构化，这里只做了示意；真实知识库由景区建设 |
-| 7 | **备案/类目/算法备案/内容安全/AI 标识落地** | **景区/小程序方主体责任**，本 MVP 不承担。只把标识文字写进了 prompt 与页脚 |
-| 8 | **基础库只有 3.7.0** | `wx.cloud.extend.AI` 要 3.7.1 起。景区方若要试云开发 AI 那条路，得用 `--baselib` 指定更高版本 |
+| 7 | **备案/类目/算法备案/内容安全/AI 标识落地** | **景区/小程序方主体责任**，本 MVP 不承担。只把 AI 生成标识文字写进 prompt 与页面 |
+| 8 | **基础库只有 3.7.0** | `wx.cloud.extend.AI` 要 3.7.1 起。本 MVP 走自建代理不走云开发 AI，不受此限；景区方若选云开发那条路需升基础库 |
 | 9 | **CORS `allow_origins=["*"]`** | 本地演示用，生产必须收紧 |
+| 10 | **BUPT key 是校园内网** | `myai.bupt.edu.cn` 只有本机能调，公网到不了。景区上线必须换可公网访问的模型服务，届时算法备案主体归属由景区承担 |
 
 **一句话定位**：这是**技术半段的可运行证据**，用来支持谈合作时说「我们这边长这样」；不是产品，不上线，不承诺平台做不到的个性化程度。
 
