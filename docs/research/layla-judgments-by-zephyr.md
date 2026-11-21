@@ -62,8 +62,44 @@
 
 ---
 
-## 未记（留给子代理调研回写）
+## 三、补充调研：行程开始后的调整与导览（子代理实抓，非阿哲判断）
 
-阿哲第二条末尾要求调查的两个问题，由子代理实抓，结果回来后另记，不混进本文件：
-1. 行程真实开始后的继续调整（到目的地后临时改 trip）
-2. 是否提供旅游导览或陪伴功能（含 24/7 WhatsApp 支持的真实形态）
+> 来源：2026-11-21 子代理 web_search + web_extract 实抓。**这一节是事实调研，不是阿哲的判断，也不是小霁的推论。**
+> 证据分层：`【官方】`layla.ai 自有页面 / 官方应用商店描述与版本记录；`【第三方】`独立媒体实测、竞品对比。查不到一律标注。
+
+### 问题 A：到目的地后临时改 trip
+
+**结论：部分支持，但形态是「App 内手动编辑 + 出问题找人工」，不是「到了当地 AI 自动实时改」。**
+
+【官方】
+- App 内有「就地编辑行程各部件」：Google Play 官方描述（更新 2026-11-19）"CHANGE ANYTHING — Swap a hotel, move a day, add a safari or a cooking class. Layla reworks the rest of the trip around it."；Apple App Store 版本记录 1.0.36「Edit your trip in place: transport, hotels, activities, car rental, airport transfer」、1.0.41「Edit any part of a trip from the trip page」。**但官方没标注为「旅途中专用」，也没承诺实时重订已确认的供应商订单。**
+- 官网七步流程第 5 步「Make it yours — Change anything until it feels right」在第 6 步「We book it」**之前**，属预订前阶段。
+- 行程真正开始后的改动走**人工**：FAQ「24/7 support throughout your travels if something unexpected happens… contact our team… including WhatsApp, for help with unexpected changes or problems」。
+- 《Travel Advisor Service Terms》（更新 2026-10-09）§11：旅客可请求更改已确认预订，Layla 评估可行性，可能受供应商可用性、改期费、价差、行政费约束，实施前披露费用；不可行/供应商禁止时无义务执行。§18「Urgent in-trip matters will be prioritised for operational support」。
+- 官方博客自述 AI 在实时中断（罢工、台风、临时闭馆）上"often a beat behind"，建议用户自己查航司 App / 旅游局 / 新闻。
+
+【第三方】
+- **未查到**任何「到目的地后按 GPS 位置自动重排当天行程」「实时交通/闭馆感知」的独立实测或官方承诺。Mashable 2024 实测的自动定位到 Austin 推荐 "near me" 属**规划期**位置推荐，不是旅途中实时更新。
+- Zenvoya（竞品自产、明确非实测、有偏向）称改已预订项目需回第三方供应商网站，与官方 §11 口径不一致，**未独立验证，不采信为事实**。
+
+### 问题 B：是否提供旅游导览 / 陪伴
+
+**结论：不是导览/陪伴产品。** 24/7 WhatsApp 是**真人旅行顾问的售后与应急通道**，不是 AI 导游。
+
+【官方】
+- WhatsApp 上由**真人旅行顾问**对接：官网首页摆出具名顾问 Carla/Aleks/Erol，文案 "Your travel advisor … stays with you on WhatsApp"；FAQ "real people to guide and support you"。
+- 底层是混合的（条款 §2：AI + 真人顾问 + 供应商系统；§29：AI 用于研究、行程开发、推荐），但**对客承诺的关系是「你的旅行顾问」这个人**。**官方没有公布一个 WhatsApp 号码/AI bot 让你随便问当地问题。**
+- 具体做什么：处理意外变更/问题、协助改单（§11）、服务差错补救（§15）、困难时信息协助（§16：健康服务/当地政府/领事/替代交通/远程通信）、接收投诉并升级（§18）。
+- **不是什么**：官方 nowhere 把它描述成逐站讲解/语音导览/现场 step-by-step 陪伴。about 页「What I do」四项（实时比价、会变的计划、交互地图、16 语言聊天）全是**规划期**能力。App Store v1.0.36「Book a call with a travel advisor from the chat」是出发前通话预约。
+
+【第三方】
+- 多篇第三方把「落地后随问随答」的角色归给 **GuideGeek**，不是 Layla：Just Gone Wandering 实测用 WhatsApp 向 GuideGeek 问「where can I find the schedules for buses and trains」，称其适合 "on-the-trip questions"；NewzV 评测（明确非实测）把 GuideGeek 列为 "Best AI Trip Planner for When You're Already There"（cheap dinner near me right now / how do I get to Sintra from here / is this neighbourhood safe at 11pm）。对 Layla 的实测均仅限**行程生成**。
+- **未查到** Layla 任何官方或第三方关于目的地导览、逐站讲解、当地实时推荐、AI 导游、WhatsApp 现场问答机器人的产品描述或实测。
+
+### 来源
+
+【官方】https://layla.ai/about · https://layla.ai/faq · https://layla.ai/ · https://layla.ai/terms/human-expert · https://play.google.com/store/apps/details?hl=en_US&id=ai.layla.android.app · https://apps.apple.com/us/app/layla-ai-trip-planner/id6758730467 · https://layla.ai/blog/news-and-tips/how-to-plan-a-trip-with-ai-2026 · https://layla.ai/plan/ai-travel-agent
+
+【第三方】https://justgonewandering.com/ai-travel-planning-chatgpt-layla-guidegeek/ · https://monkeyeatingmango.com/blog/layla-alternatives-2026/ · https://zenvoya.ai/blog/best-ai-travel-planners-2026 · https://newzv.com/productivity-ai/best-free-ai-trip-planner/ · https://me.mashable.com/tech/42988/4-ai-travel-concierge-services-thatll-help-plan-your-next-vacation
+
+**说明**：搜索 help.layla.ai 帮助中心直接命中为空，相关内容以 layla.ai/faq 与 about 页为准。竞品主张与官方条款冲突处已逐条标明，未把营销措辞当实测结论。
