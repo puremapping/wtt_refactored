@@ -10,3 +10,4 @@
 - 2026-11-12: 关键诊断 —— 分数压缩的真根因是数据契约（build_candidates 压成 9 元组丢分项），非公式问题
 - 2026-11-12: 交接给后续 session，写 HANDOVER.md（十节：已排除路径 / 三个坑 / 验收判据 / 环境坑）
 - 2026-11-12: P2 第 1+2 步落地（commit bddb8e1）。数据契约 Scored 补 5 字段；推荐三项修复（等级降闸门/室内误判根因修/美食信号）。过程中发现并修正两处新倒挂（crowd=None 当惩罚、有数据且很空反被扣分）。验收：故宫 0.0993→0.2100 无 avoid 扣分、美食≡文化→Jaccard 0.0、breakdown 合计==score。pytest 288 passed。新增 tests/test_recommend_p2.py 13 项锁行为
+- 2026-11-21: 竞品交互调研完成（2 个子代理实抓，4 产品：TripNotes/TripPlanner.ai/Layla/Klarna）→ docs/research/competitor-interaction-review.md。关键发现：TripPlanner.ai 是 Layla 导流前端；TripNotes 名实分离且原产品已停运；Klarna 因收购 Inspirock+AI assistant 范式被列入。回写父子 PLAN。

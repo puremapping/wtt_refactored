@@ -161,7 +161,7 @@ pytest tests/ -q                                →  269 passed
 > 子项目自己原创的任务（不来自本条）只在子 PLAN 内闭环，**不回写这里**。
 
 - [ ] **派发：对话交互整体重设计** → 子 PLAN 执行中；完成判据见 `wtt_ux-refactor/PLAN.md`
-  - 子 PLAN 当前进度（2026-11-12）：竞品交互调研待做；诊断已完成
+  - 子 PLAN 进度（2026-11-21）：竞品交互调研已完成（`docs/research/competitor-interaction-review.md`）；诊断已完成；整体重设计未开始
 
 ### 数据 成都缺 transport / crowd_index  ⬜ 未开始
 
