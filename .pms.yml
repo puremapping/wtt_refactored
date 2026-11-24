@@ -121,7 +121,8 @@ context:
     - 高德地图 Web 服务（地理编码/路径规划）
     - 北京市公共数据开放平台（数据已本地化到 data/wtt.db）
   reference:
-    - DESIGN.md — 设计文档（架构、流程、已知问题）
+    - PROJECT-OVERVIEW.md — 对外展示用项目设计说明（答辩/评审向，讲问题/思路/亮点/现状）
+    - DESIGN.md — 详细设计文档（架构、流程、已知问题）
     - docs/DESIGN-user-system.md — 用户系统与行为分析设计（v0.4）
     - docs/DESIGN-three-pages.md — 三页式产品设计（浏览/对话/个人）+ 身份系统
     - docs/DESIGN-conversation-itinerary-loop.md — 对话-行程闭环设计（v0.3）
